@@ -1,0 +1,52 @@
+// Minimum Gradle module wiring for the AddressIQ Location native module.
+// Apps consuming this package via React Native autolinking pick this up
+// automatically through the `react-native.config.js` packageImportPath.
+
+buildscript {
+  ext {
+    kotlinVersion = '1.9.0'
+    safeMinSdk = 23
+    safeCompileSdk = 34
+    safeTargetSdk = 34
+  }
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath "com.android.tools.build:gradle:8.1.0"
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+  }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+  namespace 'com.addressiq.location'
+  compileSdkVersion safeCompileSdk
+
+  defaultConfig {
+    minSdkVersion safeMinSdk
+    targetSdkVersion safeTargetSdk
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  kotlinOptions {
+    jvmTarget = '17'
+  }
+}
+
+repositories {
+  google()
+  mavenCentral()
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+  implementation 'com.google.android.gms:play-services-location:21.2.0'
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+}

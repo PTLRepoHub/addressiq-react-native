@@ -1,0 +1,45 @@
+name: Release
+
+# Publishes @addressiq/react-native to npm. Push a tag `vX.Y.Z` to release at
+# that version, or run manually (dry-run by default).
+#
+# Required secret: NPM_TOKEN (npm automation token).
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (validate packaging, publish nothing)"
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+      - name: Set version from tag + publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"; DRY="false"
+          else
+            VERSION="$(node -p "require('./package.json').version")"; DRY="${{ github.event.inputs.dry_run }}"
+          fi
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          if [ "$DRY" = "true" ]; then
+            npm publish --access public --dry-run
+          else
+            npm publish --access public
+          fi

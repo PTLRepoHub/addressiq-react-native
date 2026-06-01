@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.turbo/
+*.log
+# Android/iOS build artifacts (the SDK's native source under android/ & ios/ is tracked)
+android/build/
+android/.gradle/
+ios/build/
