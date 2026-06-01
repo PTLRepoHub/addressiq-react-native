@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 .turbo/
 *.log
+.expo/
+examples/*/package-lock.json
 # Android/iOS build artifacts (the SDK's native source under android/ & ios/ is tracked)
 android/build/
 android/.gradle/

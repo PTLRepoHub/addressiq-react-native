@@ -21,7 +21,8 @@
     "test": "jest",
     "lint": "eslint src",
     "type-check": "tsc --noEmit",
-    "example": "npm --prefix examples/app install && npm --prefix examples/app run type-check"
+    "example:core": "npm --prefix examples/core install && npm --prefix examples/core run type-check",
+    "example:expo": "npm --prefix examples/expo install && npm --prefix examples/expo start"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

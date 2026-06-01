@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build · test · example type-check
+    name: Build · test · examples
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +18,8 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npm test
-      # The example links to the local SDK via `file:../..`; type-check it.
-      - run: npm --prefix examples/app install
-      - run: npm --prefix examples/app run type-check
+      # Both examples link to the local SDK via `file:../..`; type-check each.
+      - run: npm --prefix examples/core install
+      - run: npm --prefix examples/core run type-check
+      - run: npm --prefix examples/expo install
+      - run: npm --prefix examples/expo run type-check
