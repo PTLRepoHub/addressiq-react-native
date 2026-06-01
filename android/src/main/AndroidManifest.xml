@@ -1,0 +1,42 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.addressiq.location">
+
+  <!--
+    Required permissions. Partners declare these in their app manifest;
+    listed here so they merge into the final manifest via Gradle's
+    manifest merger.
+  -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <application>
+    <!--
+      Receives geofence ENTER/EXIT/DWELL broadcasts from Play Services.
+      Manifest-registered so the OS can deliver transitions even when the
+      host process is dead.
+    -->
+    <receiver
+        android:name="com.addressiq.location.AddressIQGeofenceReceiver"
+        android:exported="false">
+      <intent-filter>
+        <action android:name="com.addressiq.location.GEOFENCE_TRANSITION" />
+      </intent-filter>
+    </receiver>
+
+    <!--
+      Foreground service that keeps the FusedLocationProvider subscription
+      alive while the host app is backgrounded. Promoted to foreground
+      only while collection is active (started/stopped from the JS
+      module's startBackgroundLocation/stopBackgroundLocation calls).
+    -->
+    <service
+        android:name="com.addressiq.location.AddressIQLocationService"
+        android:exported="false"
+        android:foregroundServiceType="location" />
+  </application>
+</manifest>
