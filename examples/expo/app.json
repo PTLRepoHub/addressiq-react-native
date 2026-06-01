@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "AddressIQ Core (Expo)",
+    "slug": "addressiq-rn-expo-example",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "AddressIQ verifies your address using your location.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "AddressIQ verifies your address in the background during the verification window."
+      }
+    },
+    "android": {
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION"]
+    }
+  }
+}

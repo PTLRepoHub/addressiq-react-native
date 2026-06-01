@@ -13,8 +13,13 @@ code, so not Expo Go).
 ```
 .                  ← the SDK (@addressiq/react-native): src/, android/, ios/, podspec
   __tests__/       smoke test (jest)
-  examples/app/    minimal example, linked to the LOCAL SDK (file: symlink)
+  examples/core/   bare React Native example, linked to the LOCAL SDK
+  examples/expo/   Expo (managed) example — same core SDK, via a dev build
 ```
+
+Both examples consume the **same** core SDK via `@addressiq/react-native:
+"file:../.."` (npm symlinks it), demonstrating that the core SDK works in both
+bare-RN and Expo apps.
 
 ## Develop
 
@@ -25,17 +30,17 @@ npm test           # jest smoke test
 npm run type-check # tsc --noEmit
 ```
 
-## Example against your local SDK
+## Examples against your local SDK
 
 ```bash
-npm run example    # installs examples/app (file:../.. link) + type-checks it
+npm run example:core   # bare RN example — install + type-check
+npm run example:expo   # Expo example — install + `expo start`
 ```
 
-`examples/app` depends on `@addressiq/react-native: "file:../.."`, which npm
-symlinks to this repo — so edits to `src/` are picked up immediately. The
-example's `App.tsx` is a drop-in for your own bare-RN or Expo (dev build) app;
-running it on a device requires autolinking the native module (`pod install`
-on iOS, Gradle autolink on Android).
+Edits to `src/` are picked up immediately via the `file:../..` symlink. Running
+on a device needs the native module autolinked: bare RN uses `pod install` /
+Gradle autolink; the Expo example needs a **dev build** (`npx expo prebuild`),
+not Expo Go, because the SDK ships native code.
 
 ## Release
 
@@ -50,5 +55,5 @@ Requires the `NPM_TOKEN` repository secret. Run the workflow manually with
 
 ## Contributing
 
-Fork, branch, PR. CI builds the SDK, runs the smoke test, and type-checks the
-example against the local SDK on every push/PR.
+Fork, branch, PR. CI builds the SDK, runs the smoke test, and type-checks both
+examples against the local SDK on every push/PR.
