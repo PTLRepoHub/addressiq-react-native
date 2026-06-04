@@ -1,0 +1,19 @@
+version: v2
+# The wire contract lives in PTLRepoHub/AddressIq-proto. We pull it straight
+# from git so no Buf Schema Registry account is required. Once the proto repo
+# publishes to the BSR, swap the input for:
+#   inputs:
+#     - module: buf.build/addressiq/addressiq
+inputs:
+  - git_repo: https://github.com/PTLRepoHub/AddressIq-proto.git
+    branch: main
+plugins:
+  # Type-only bindings: the web SDK speaks REST/JSON, so it needs the message
+  # shapes and enums, not protobuf binary encode/decode. onlyTypes keeps the
+  # output dependency-free (no protobufjs/long runtime).
+  - remote: buf.build/community/stephenh-ts-proto:v1.181.2
+    out: src/proto
+    opt:
+      - onlyTypes=true
+      - esModuleInterop=true
+      - useOptionals=messages
