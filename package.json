@@ -18,6 +18,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "proto:gen": "buf generate",
     "test": "jest",
     "lint": "eslint src",
     "type-check": "tsc --noEmit",
