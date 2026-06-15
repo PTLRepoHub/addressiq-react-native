@@ -30,13 +30,15 @@ import ResultModal from '../components/ResultModal';
 import SettingsSheet from '../components/SettingsSheet';
 import { loadAddresses, saveAddress, type SessionData } from '../storage';
 
-function loadCredentials(): Record<string, { apiKey: string }> {
+type Creds = Record<string, { apiKey: string; googleMapsApiKey?: string }>;
+
+function loadCredentials(): Creds {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('../config/credentials.json') as Record<string, { apiKey: string }>;
+    return require('../config/credentials.json') as Creds;
   } catch {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('../config/credentials.template.json') as Record<string, { apiKey: string }>;
+    return require('../config/credentials.template.json') as Creds;
   }
 }
 
@@ -69,7 +71,12 @@ export default function VerificationScreen({
   const [modal, setModal] = useState<{ title: string; payload: unknown; type?: string } | null>(null);
   const activeVerification = useRef<string | null>(null);
 
-  const apiKey = loadCredentials()[session.environment]?.apiKey ?? '';
+  const creds = loadCredentials()[session.environment];
+  const apiKey = creds?.apiKey ?? '';
+  // Set this in credentials.json to enable the full map flow (Places
+  // autocomplete + Street View). Without it the address step shows the Apple
+  // Maps pin + manual entry.
+  const googleMapsApiKey = creds?.googleMapsApiKey;
 
   const refreshSaved = useCallback(async () => {
     const list = await loadAddresses();
@@ -257,6 +264,7 @@ export default function VerificationScreen({
       <IQLocationManager
         visible={widgetOpen}
         apiKey={apiKey}
+        googleMapsApiKey={googleMapsApiKey}
         environment={session.environment}
         appUserId={session.appUserId}
         firstName={session.firstName}

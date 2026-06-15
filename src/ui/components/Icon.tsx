@@ -1,16 +1,13 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, Text } from 'react-native';
 
 /**
  * Icon component — lazy-loads `react-native-vector-icons/Ionicons` (the
  * bare-RN standard) and falls back to `@expo/vector-icons` (when the
- * partner happens to be on Expo). When neither is installed, renders an
- * empty placeholder of the requested size so layouts don't shift.
- *
- * Partners on bare RN should:
- *   yarn add react-native-vector-icons
- *   cd ios && pod install
- * to get the icon glyphs. The SDK doesn't bundle the font asset itself.
+ * partner happens to be on Expo). When neither is installed, renders a
+ * built-in Unicode glyph so the Collect UI icons are always visible without
+ * the partner having to install + link an icon font. Crisp vector glyphs ship
+ * automatically once `react-native-vector-icons` is added (+ `pod install`).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Ionicons: any = null;
@@ -70,6 +67,42 @@ const ICON_MAP = {
 
 export type IconName = keyof typeof ICON_MAP;
 
+/**
+ * Unicode fallback glyphs — rendered when no icon font is installed so the
+ * Collect UI is never missing its icons. Monochrome glyphs (✕ ✓ ‹ …) pick up
+ * the themed `color`; a few use an emoji where no clean monochrome glyph exists.
+ */
+const GLYPH_FALLBACK: Record<IconName, string> = {
+  'location-pin': '📍',
+  'location-outline': '📍',
+  navigate: '➤',
+  map: '🗺',
+  'arrow-back': '‹',
+  close: '✕',
+  'chevron-forward': '›',
+  search: '🔍',
+  refresh: '↻',
+  camera: '📷',
+  image: '🖼',
+  trash: '🗑',
+  checkmark: '✓',
+  'checkmark-circle': '✓',
+  'shield-checkmark': '✓',
+  'alert-circle': '⚠',
+  home: '⌂',
+  'home-outline': '⌂',
+  business: '🏢',
+  'color-palette': '🎨',
+  'lock-closed': '🔒',
+  time: '🕘',
+  ban: '⊘',
+  radio: '◉',
+  bulb: '💡',
+  notifications: '🔔',
+  settings: '⚙',
+  'information-circle': 'ⓘ',
+};
+
 interface Props {
   name: IconName;
   size?: number;
@@ -78,8 +111,18 @@ interface Props {
 
 export default function Icon({ name, size = 24, color = '#000' }: Props) {
   const mapping = ICON_MAP[name];
-  if (!mapping || !Ionicons) {
-    return <View style={{ width: size, height: size }} />;
+  if (mapping && Ionicons) {
+    return <Ionicons name={mapping.name} size={size} color={color} />;
   }
-  return <Ionicons name={mapping.name} size={size} color={color} />;
+  // No icon font available — render a built-in Unicode glyph so the icon is
+  // still visible (vs. an invisible placeholder).
+  const glyph = GLYPH_FALLBACK[name];
+  if (glyph) {
+    return (
+      <Text style={{ fontSize: size * 0.92, lineHeight: size * 1.1, color, textAlign: 'center', width: size }}>
+        {glyph}
+      </Text>
+    );
+  }
+  return <View style={{ width: size, height: size }} />;
 }

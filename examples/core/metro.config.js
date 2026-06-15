@@ -30,6 +30,16 @@ const config = {
     extraNodeModules: {
       react: path.resolve(__dirname, 'node_modules/react'),
       'react-native': path.resolve(__dirname, 'node_modules/react-native'),
+      // The Collect UI map flow's optional native deps are installed in THIS
+      // example, not in the symlinked SDK. Map them so the SDK's
+      // `require('react-native-maps')` / `react-native-webview` resolve instead
+      // of being dropped as unresolved-optional ("Requiring unknown module undefined").
+      'react-native-maps': path.resolve(__dirname, 'node_modules/react-native-maps'),
+      'react-native-webview': path.resolve(__dirname, 'node_modules/react-native-webview'),
+      // Same reason for the Collect UI icon font: the SDK's
+      // `require('react-native-vector-icons/Ionicons')` must resolve to the copy
+      // installed here, else icons fall back to (colourful) Unicode glyphs.
+      'react-native-vector-icons': path.resolve(__dirname, 'node_modules/react-native-vector-icons'),
     },
   },
 };

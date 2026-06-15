@@ -5,7 +5,9 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, min_ios_version_supported
+# Bumped from min_ios_version_supported (13.4) to 15.1 — react-native-maps@1.26
+# (the Collect UI map flow's optional peer dep) requires iOS 15.1.
+platform :ios, '15.1'
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']

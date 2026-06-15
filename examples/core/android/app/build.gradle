@@ -81,6 +81,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // react-native-maps Google Maps key for Android base tiles. Read from
+        // the build environment so the live key never lands in tracked source
+        // (mirrors the iOS SIMCTL_CHILD_GOOGLE_MAPS_KEY injection). Empty by
+        // default → app builds + runs, native map tiles stay blank until set.
+        manifestPlaceholders = [GOOGLE_MAPS_API_KEY: (System.getenv("GOOGLE_MAPS_API_KEY") ?: "")]
     }
     signingConfigs {
         debug {

@@ -59,7 +59,6 @@ export default function AddressMap({ theme, lat, lon, onPinMove }: Props) {
     <View style={[styles.mapWrap, { borderColor: theme.border }]}>
       <MapView
         style={styles.map}
-        provider={maps.PROVIDER_GOOGLE}
         region={region}
         onPress={(e: { nativeEvent: { coordinate: LatLng } }) =>
           onPinMove(e.nativeEvent.coordinate.latitude, e.nativeEvent.coordinate.longitude)

@@ -62,6 +62,8 @@ export default function AddressScreen({
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [resolvingAddr, setResolvingAddr] = useState(false);
+  // §6.6 step 5: "Current Location | Search Address" input tabs.
+  const [mode, setMode] = useState<'current' | 'search'>('current');
 
   const [checkingCoverage, setCheckingCoverage] = useState(false);
 
@@ -173,6 +175,25 @@ export default function AddressScreen({
       }
     >
       {mapsKey ? (
+        <View style={styles.tabBar}>
+          {(['current', 'search'] as const).map((m) => {
+            const active = mode === m;
+            return (
+              <TouchableOpacity
+                key={m}
+                style={[styles.tab, active && { backgroundColor: theme.surface, borderColor: theme.primary }]}
+                onPress={() => setMode(m)}
+              >
+                <Text style={[styles.tabText, { color: active ? theme.primary : theme.textSecondary }]}>
+                  {m === 'current' ? 'Current Location' : 'Search Address'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {mapsKey && mode === 'search' ? (
         <View style={styles.searchBlock}>
           <View style={[styles.searchBar, { borderColor: theme.border, backgroundColor: theme.surface }]}>
             <Icon name="navigate" size={16} color={theme.textSecondary} />
@@ -212,10 +233,12 @@ export default function AddressScreen({
         <AddressMap theme={theme} lat={coords.lat} lon={coords.lon} onPinMove={(lat, lon) => void applyPoint(lat, lon)} />
       ) : null}
 
-      <TouchableOpacity onPress={captureLocation} style={styles.useLocation}>
-        <Icon name="navigate" size={14} color={theme.primary} />
-        <Text style={[styles.useLocationText, { color: theme.primary }]}>Use my current location</Text>
-      </TouchableOpacity>
+      {mode === 'current' || !mapsKey ? (
+        <TouchableOpacity onPress={captureLocation} style={styles.useLocation}>
+          <Icon name="navigate" size={14} color={theme.primary} />
+          <Text style={[styles.useLocationText, { color: theme.primary }]}>Use my current location</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <Text style={[styles.label, { color: theme.text }]}>Formatted address</Text>
       {mapsKey ? (
@@ -255,6 +278,9 @@ function hashString(s: string): number {
 }
 
 const styles = StyleSheet.create({
+  tabBar: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: 'transparent' },
+  tabText: { fontSize: 13, fontWeight: '600' },
   searchBlock: { marginBottom: 14, zIndex: 10 },
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 46 },
   searchInput: { flex: 1, fontSize: 15 },

@@ -130,8 +130,41 @@ background location mode (iOS).
 
 [`examples/core`](examples/core) is the OkHi-style guided demo (Login →
 Verification hub → Collect UI → SDK API verify → Helpers → Addresses → Developer
-→ Logout). Run it with `npm run example:core`. The shared Maestro happy path
-lives at `geo-tagging/apps/e2e/maestro/flows/collect-verify/happy-path.yaml`.
+→ Logout). The shared Maestro happy path lives at
+`geo-tagging/apps/e2e/maestro/flows/collect-verify/happy-path.yaml`.
+
+**Run it on a simulator/device** (bare RN — `examples/core`):
+
+```bash
+# 0. Build the SDK once so the example's file:../.. link resolves
+npm install && npm run build
+
+# 1. Credentials — copy the template, then fill in your keys
+cd examples/core
+cp src/config/credentials.template.json src/config/credentials.json
+#   edit src/config/credentials.json:
+#     - apiKey:           tenant key per environment (the `staging`/`local`
+#                         entries are pre-seeded with aiq_test_demo_bank_seed01)
+#     - googleMapsApiKey: enables the map + Street View flow (optional — the
+#                         address step degrades to GPS + manual entry without it)
+#   credentials.json is gitignored; the template is the only tracked file.
+
+# 2. Install + native link
+npm install
+cd ios && pod install && cd ..      # iOS only
+
+# 3. Launch (Metro starts automatically)
+npm run ios                          # or: npm run android
+```
+
+Pick the environment (`staging` / `local` / `production`) on the **Login**
+screen — it selects the API + ingest hosts. Use `local` only when the
+[`geo-tagging`](https://github.com/PTLRepoHub) backend stack is running
+(`docker compose up -d && pnpm dev`, API on `:4000`); otherwise use `staging`.
+
+> **Expo example** (`examples/expo`) needs a **dev build**
+> (`npx expo prebuild && npx expo run:ios`), not Expo Go — the SDK ships
+> native code that Expo Go can't load.
 
 ## Environment
 

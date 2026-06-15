@@ -42,6 +42,13 @@
 	<array>
 		<string>location</string>
 	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<!-- Collect UI icon font (react-native-vector-icons). The RNVectorIcons
+		     pod bundles Fonts/*.ttf; register the one the SDK's Icon component
+		     uses so glyphs render as crisp Ionicons instead of Unicode fallbacks. -->
+		<string>Ionicons.ttf</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
