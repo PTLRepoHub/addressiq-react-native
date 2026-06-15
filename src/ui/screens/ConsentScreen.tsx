@@ -23,8 +23,6 @@ export default function ConsentScreen({ theme, address, onSubmit, onBack, onCanc
     <ScreenWrapper
       theme={theme}
       title="Almost done!"
-      step={3}
-      totalSteps={4}
       onBack={onBack}
       onClose={onCancel}
       footer={

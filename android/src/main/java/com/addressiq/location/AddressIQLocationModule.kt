@@ -95,6 +95,23 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
     )
   }
 
+  @ReactMethod
+  fun getLocationPermissionStatuses(promise: Promise) {
+    val fgGranted =
+      ContextCompat.checkSelfPermission(reactCtx, Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
+    val bgGranted = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+      fgGranted
+    } else {
+      ContextCompat.checkSelfPermission(reactCtx, Manifest.permission.ACCESS_BACKGROUND_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
+    }
+    val map = Arguments.createMap()
+    map.putString("foreground", if (fgGranted) "GRANTED" else "NOT_DETERMINED")
+    map.putString("background", if (bgGranted) "GRANTED" else "NOT_DETERMINED")
+    promise.resolve(map)
+  }
+
   /**
    * The activity-bound permission prompt belongs in JS (via
    * `PermissionsAndroid`) where it can be coordinated with the host app's

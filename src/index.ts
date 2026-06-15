@@ -19,6 +19,8 @@ import { getNativeModule, getNativeEmitter, isNativeLinked } from './native/brid
 import { AddressIQError } from './errors';
 import * as telemetry from './telemetry';
 import * as api from './api';
+import { startCollectionForVerification } from './collection';
+import { makeIdempotencyKey } from './idempotency';
 import type {
   AddressIQConfig,
   SdkUser,
@@ -40,6 +42,7 @@ export type {
   AddressIQEnvironment,
   AddressIQTheme,
   AddressData,
+  CollectResult,
   VerifyResult,
   IQLocationManagerProps,
   SdkUser,
@@ -62,11 +65,14 @@ export type {
   StartPhysicalResult,
   StartCombinedArgs,
   StartCombinedResult,
+  StartVerificationArgs,
+  StartVerificationResult,
   ProviderEntry,
 } from './api';
 
 export { isNativeLinked } from './native/bridge';
 export { default as IQLocationManager } from './ui/IQLocationManager';
+export { DEFAULT_THEME, mergeTheme } from './ui/theme';
 export { AddressIQError, isAddressIQError } from './errors';
 export type { AddressIQErrorCode } from './errors';
 
@@ -78,6 +84,10 @@ let activeVerificationId: string | null = null;
 let activeLocationCode: string | null = null;
 let pausedAt: number | null = null;
 let statusListeners: StatusChangeCallback[] = [];
+
+/** Tracks Android permission prompts so BLOCKED can be distinguished from NOT_DETERMINED. */
+let androidFgPermissionPrompted = false;
+let androidBgPermissionPrompted = false;
 
 // ── Public API ──
 
@@ -210,14 +220,15 @@ export async function requestPermissions(): Promise<boolean> {
       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
     ]);
+    androidFgPermissionPrompted = true;
     const fineGranted =
       fg[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
     if (!fineGranted) return false;
-
     if (Platform.Version >= 29) {
       const bg = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
       );
+      androidBgPermissionPrompted = true;
       return bg === PermissionsAndroid.RESULTS.GRANTED;
     }
     return true;
@@ -290,14 +301,45 @@ export async function openSettings(): Promise<boolean> {
 
 /** Snapshot of the current permission state. */
 export async function getPermissionState(): Promise<PermissionState> {
+  const { Platform, PermissionsAndroid } = require('react-native') as {
+    Platform: { OS: string; Version: number };
+    PermissionsAndroid?: {
+      PERMISSIONS: Record<string, string>;
+      RESULTS: { GRANTED: string };
+      check: (perm: string) => Promise<boolean>;
+      shouldShowRequestPermissionRationale: (perm: string) => Promise<boolean>;
+    };
+  };
+
+  if (Platform.OS === 'android' && PermissionsAndroid) {
+    const fgPerm = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+    const bgPerm = PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION;
+    const [fgGranted, bgGranted] = await Promise.all([
+      PermissionsAndroid.check(fgPerm),
+      Platform.Version >= 29
+        ? PermissionsAndroid.check(bgPerm)
+        : PermissionsAndroid.check(fgPerm),
+    ]);
+    return {
+      foregroundLocation: fgGranted
+        ? 'GRANTED'
+        : await mapAndroidPermissionStatus(fgPerm, androidFgPermissionPrompted),
+      backgroundLocation: bgGranted
+        ? 'GRANTED'
+        : Platform.Version >= 29
+          ? await mapAndroidPermissionStatus(bgPerm, androidBgPermissionPrompted)
+          : fgGranted
+            ? 'GRANTED'
+            : await mapAndroidPermissionStatus(fgPerm, androidFgPermissionPrompted),
+      notifications: 'NOT_DETERMINED',
+    };
+  }
+
   const native = getNativeModule();
-  const [fg, bg] = await Promise.all([
-    native.hasLocationPermission(),
-    native.hasBackgroundLocationPermission(),
-  ]);
+  const status = await native.getLocationPermissionStatuses();
   return {
-    foregroundLocation: fg ? 'GRANTED' : 'NOT_DETERMINED',
-    backgroundLocation: bg ? 'GRANTED' : 'NOT_DETERMINED',
+    foregroundLocation: status.foreground,
+    backgroundLocation: status.background,
     notifications: 'NOT_DETERMINED',
   };
 }
@@ -414,18 +456,31 @@ export function onGeofenceTransition(cb: (event: GeofenceTransition) => void): (
  * Start a physical address verification. A partner-provided agent or
  * KYC provider visits the address to confirm residency.
  */
+/**
+ * Start a digital address verification. Uses SDK telemetry + geofencing
+ * to score residency at the given location.
+ */
+export async function startVerification(
+  args: Omit<api.StartVerificationArgs, 'idempotencyKey'> & { idempotencyKey?: string },
+): Promise<api.StartVerificationResult> {
+  await assertReadyForVerificationStart();
+  const result = await api.startVerification({
+    ...args,
+    idempotencyKey: args.idempotencyKey ?? makeIdempotencyKey('digital'),
+  });
+  await activateVerificationSession(args.locationCode, result.verificationCode, result.geofence);
+  return result;
+}
+
 export async function startPhysicalVerification(
   args: Omit<api.StartPhysicalArgs, 'idempotencyKey'> & { idempotencyKey?: string },
 ): Promise<api.StartPhysicalResult> {
+  await assertReadyForVerificationStart();
   const result = await api.startPhysical({
     ...args,
     idempotencyKey: args.idempotencyKey ?? makeIdempotencyKey('physical'),
   });
-  activeVerificationId = result.verificationCode;
-  activeLocationCode = args.locationCode;
-  lifecycleState = 'COLLECTING';
-  telemetry.setSession(args.locationCode, result.verificationCode);
-  await autoRegisterGeofence(result.verificationCode, result.geofence);
+  await activateVerificationSession(args.locationCode, result.verificationCode, result.geofence);
   return result;
 }
 
@@ -437,15 +492,12 @@ export async function startPhysicalVerification(
 export async function startDigitalAndPhysicalVerification(
   args: Omit<api.StartCombinedArgs, 'idempotencyKey'> & { idempotencyKey?: string },
 ): Promise<api.StartCombinedResult> {
+  await assertReadyForVerificationStart();
   const result = await api.startCombined({
     ...args,
     idempotencyKey: args.idempotencyKey ?? makeIdempotencyKey('combined'),
   });
-  activeVerificationId = result.verificationCode;
-  activeLocationCode = args.locationCode;
-  lifecycleState = 'COLLECTING';
-  telemetry.setSession(args.locationCode, result.verificationCode);
-  await autoRegisterGeofence(result.verificationCode, result.geofence);
+  await activateVerificationSession(args.locationCode, result.verificationCode, result.geofence);
   return result;
 }
 
@@ -556,9 +608,6 @@ function notifyListeners(result: VerificationResult): void {
   }
 }
 
-function makeIdempotencyKey(scope: string): string {
-  return `iqidem_rn_${scope}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
 
 /**
  * Auto-register an adaptive geofence after `startPhysical` / `startCombined`
@@ -566,19 +615,51 @@ function makeIdempotencyKey(scope: string): string {
  * omits coordinates — callers who manage geofences themselves can call
  * `registerGeofence()` directly.
  */
-async function autoRegisterGeofence(
+async function assertReadyForVerificationStart(): Promise<void> {
+  getConfig();
+  if (!user?.appUserId) {
+    throw new AddressIQError('INVALID_USER', 'setUser: appUserId is required before starting verification');
+  }
+  if (lifecycleState !== 'IDLE' && lifecycleState !== 'PAUSED') {
+    throw new AddressIQError(
+      'ARGS_INVALID',
+      `Cannot start verification while lifecycle state is ${lifecycleState}`,
+    );
+  }
+  const permissions = await getPermissionState();
+  if (
+    permissions.foregroundLocation !== 'GRANTED' ||
+    permissions.backgroundLocation !== 'GRANTED'
+  ) {
+    throw new AddressIQError(
+      'PERMISSION_DENIED',
+      'Foreground and background location permissions are required before starting verification',
+    );
+  }
+}
+
+async function activateVerificationSession(
+  locationCode: string,
   verificationCode: string,
   geofence: { lat: number; lon: number; radiusM: number } | undefined,
 ): Promise<void> {
-  if (!geofence) return;
-  try {
-    await registerGeofence({
-      identifier: verificationCode,
-      lat: geofence.lat,
-      lon: geofence.lon,
-      radiusM: geofence.radiusM,
-    });
-  } catch {
-    // Best-effort — partner can retry via the public `registerGeofence`.
-  }
+  activeVerificationId = verificationCode;
+  activeLocationCode = locationCode;
+  lifecycleState = 'COLLECTING';
+  pausedAt = null;
+  await startCollectionForVerification(locationCode, verificationCode, geofence);
+}
+
+async function mapAndroidPermissionStatus(
+  permission: string,
+  prompted: boolean,
+): Promise<PermissionState['foregroundLocation']> {
+  const { PermissionsAndroid } = require('react-native') as {
+    PermissionsAndroid: {
+      shouldShowRequestPermissionRationale: (perm: string) => Promise<boolean>;
+    };
+  };
+  const rationale = await PermissionsAndroid.shouldShowRequestPermissionRationale(permission);
+  if (rationale) return 'DENIED';
+  return prompted ? 'BLOCKED' : 'NOT_DETERMINED';
 }

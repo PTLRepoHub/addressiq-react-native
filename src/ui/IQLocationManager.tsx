@@ -1,37 +1,41 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, View, StyleSheet, ActivityIndicator, Text } from 'react-native';
-import type { AddressData, IQLocationManagerProps, LocationReading, VerifyResult } from '../types';
+import type { AddressData, IQLocationManagerProps, LocationReading, CollectResult } from '../types';
 import { resolveUrls, setConfig } from '../config';
 import { getNativeModule } from '../native/bridge';
 import { AddressIQError } from '../errors';
-import { setSession as setTelemetrySession, flushQueue } from '../telemetry';
+import { makeIdempotencyKey } from '../idempotency';
+import { resolveGoogleMapsKey } from '../maps';
 import { mergeTheme } from './theme';
 import LocationPermissionScreen from './screens/LocationPermissionScreen';
 import AddressScreen from './screens/AddressScreen';
+import StreetViewScreen from './screens/StreetViewScreen';
 import PropertyDetailsScreen from './screens/PropertyDetailsScreen';
 import ConsentScreen from './screens/ConsentScreen';
 import SuccessScreen from './screens/SuccessScreen';
 
 /**
- * `<IQLocationManager>` — collect + verify widget for `@addressiq/react-native`.
+ * `<IQLocationManager>` — the Collect UI widget for `@addressiq/react-native`.
  *
- * Full themed flow ported from the Expo SDK:
+ * Full themed flow:
  *   loading → permission → address → details → consent → success
  *
- * Drops Street View (which depends on react-native-webview + Google
- * Maps Street View API) and the Google Places autocomplete in
- * AddressScreen — partners on bare RN typically already have their
- * own address pickers. The address step captures GPS coordinates +
- * a free-text formatted address; the property-details step captures
- * house number, street, building color, and optional directions.
+ * **Collect only.** The widget captures and saves the address (returning its
+ * `locationCode` via `onComplete`); it does NOT start a verification. The host
+ * owns when verification begins — call `AddressIQ.startVerification({ locationCode })`
+ * from the `onComplete` callback.
+ *
+ * The address step uses the Google map flow (current location / Places
+ * autocomplete → auto-derived formatted address → Street View pin-confirm where
+ * covered), falling back to GPS + manual entry when no Maps key is configured.
  */
-type Stage = 'loading' | 'permission' | 'address' | 'details' | 'consent' | 'success' | 'error';
+type Stage = 'loading' | 'permission' | 'address' | 'streetview' | 'details' | 'consent' | 'success' | 'error';
 
 export default function IQLocationManager(props: IQLocationManagerProps) {
   const theme = mergeTheme(props.theme);
   const [stage, setStage] = useState<Stage>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<VerifyResult | null>(null);
+  const [result, setResult] = useState<CollectResult | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [address, setAddress] = useState<Partial<AddressData>>(props.initialAddress ?? {});
   const [submitting, setSubmitting] = useState(false);
@@ -42,6 +46,7 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
     setConfig({
       apiKey: props.apiKey,
       environment: props.environment ?? 'production',
+      googleMapsApiKey: props.googleMapsApiKey,
     });
     setStage('loading');
     setError(null);
@@ -62,7 +67,12 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
     const { apiUrl } = resolveUrls();
     const res = await fetch(`${apiUrl}/api/v1/widget/sessions/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': props.apiKey },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': props.apiKey,
+        // The backend rejects state-creating POSTs without an idempotency key.
+        'Idempotency-Key': makeIdempotencyKey('widget_session'),
+      },
       body: JSON.stringify({
         appUserId: props.appUserId,
         phone: props.phone,
@@ -115,11 +125,17 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
     setSubmitting(true);
     try {
       const { apiUrl } = resolveUrls();
-      const res = await fetch(`${apiUrl}/api/v1/widget/submit`, {
+      // Collect-only endpoint: creates the Location and returns its
+      // `locationCode`. It does NOT start a verification or wire collection —
+      // the host owns that via `startVerification({ locationCode })` in
+      // `onComplete` (contract §collect-verify split).
+      const res = await fetch(`${apiUrl}/api/v1/widget/collect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${sessionToken}`,
+          // The backend rejects state-creating POSTs without an idempotency key.
+          'Idempotency-Key': makeIdempotencyKey('widget_collect'),
         },
         body: JSON.stringify({
           lat: address.lat,
@@ -131,30 +147,38 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
           buildingColor: address.buildingColor,
           propertyName: address.propertyName,
           directions: address.directions,
+          plusCode: address.plusCode,
+          streetviewPanoId: address.streetviewPanoId,
+          streetviewLat: address.streetviewLat,
+          streetviewLon: address.streetviewLon,
+          streetviewHeading: address.streetviewHeading,
         }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new AddressIQError('HTTP_ERROR', body.message || `Submit failed (${res.status})`, {
+        throw new AddressIQError('HTTP_ERROR', body.message || `Collect failed (${res.status})`, {
           httpStatus: res.status,
           serverPayload: body,
         });
       }
-      const data = (await res.json()) as { verificationId: string; locationId: string; status: string };
-      const r: VerifyResult = {
-        verificationId: data.verificationId,
-        locationId: data.locationId,
-        status: data.status,
+      const data = (await res.json()) as {
+        locationCode: string;
+        formattedAddress?: string;
+        isExisting?: boolean;
+      };
+      const r: CollectResult = {
+        locationCode: data.locationCode,
+        formattedAddress: data.formattedAddress ?? address.formattedAddress,
+        lat: address.lat!,
+        lon: address.lon!,
+        placeId: address.placeId,
+        isExisting: data.isExisting,
       };
       setResult(r);
       setStage('success');
 
-      // Bind the telemetry session so subsequent native location +
-      // geofence events are packaged into the §5 envelope. Flush in
-      // the background so the first batch ships immediately.
-      setTelemetrySession(data.locationId, data.verificationId);
-      void flushQueue().catch(() => undefined);
-
+      // No collection wiring here — verification (and its geofence + background
+      // collection) is started by the host from `onComplete`.
       props.onComplete?.(r);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -206,10 +230,35 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
             theme={theme}
             initialAddress={address}
             getCurrentLocation={getCurrentLocation}
+            googleMapsApiKey={props.googleMapsApiKey}
             onNext={(patch) => {
               updateAddress(patch);
               setStage('details');
             }}
+            onStreetView={(patch) => {
+              updateAddress(patch);
+              setStage('streetview');
+            }}
+            onCancel={props.onCancel ?? (() => undefined)}
+          />
+        );
+      case 'streetview':
+        return (
+          <StreetViewScreen
+            theme={theme}
+            apiKey={resolveGoogleMapsKey(props.googleMapsApiKey) ?? ''}
+            lat={address.lat ?? 0}
+            lon={address.lon ?? 0}
+            onConfirm={(c) => {
+              updateAddress({
+                streetviewPanoId: c.panoId,
+                streetviewHeading: c.heading,
+                streetviewLat: c.lat,
+                streetviewLon: c.lon,
+              });
+              setStage('details');
+            }}
+            onBack={() => setStage('address')}
             onCancel={props.onCancel ?? (() => undefined)}
           />
         );
@@ -248,6 +297,18 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
     }
   })();
 
+  // Step indicator (P1-2): show progress through the user-facing capture
+  // steps. `loading` / `success` / `error` are not numbered steps.
+  const stepIndex = STEP_STAGES.indexOf(stage as (typeof STEP_STAGES)[number]);
+  const body = (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {stepIndex >= 0 ? (
+        <StepIndicator theme={theme} current={stepIndex} total={STEP_STAGES.length} />
+      ) : null}
+      {content}
+    </View>
+  );
+
   if ('visible' in props) {
     return (
       <Modal
@@ -256,11 +317,54 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
         presentationStyle="pageSheet"
         onRequestClose={props.onCancel}
       >
-        <View style={[styles.container, { backgroundColor: theme.background }]}>{content}</View>
+        {body}
       </Modal>
     );
   }
-  return <View style={[styles.container, { backgroundColor: theme.background }]}>{content}</View>;
+  return body;
+}
+
+/** Ordered user-facing capture steps used by the step indicator (P1-2). */
+// §6.6 canon: the 4 numbered capture steps (5–8) shown as "Step X of 4".
+// Permission (step 4) is not numbered; streetview (step 6) is numbered but
+// skipped when there's no Street View coverage.
+const STEP_STAGES = ['address', 'streetview', 'details', 'consent'] as const;
+
+/**
+ * Slim progress indicator shown atop the Collect UI multi-step flow. Renders
+ * a dot per step plus a "Step X of N" label, themed via `AddressIQTheme`.
+ * Mirrored on the Flutter / iOS / Android widgets for cross-SDK parity.
+ */
+function StepIndicator({
+  theme,
+  current,
+  total,
+}: {
+  theme: ReturnType<typeof mergeTheme>;
+  current: number;
+  total: number;
+}) {
+  return (
+    <View style={stepStyles.row}>
+      <View style={stepStyles.dots}>
+        {Array.from({ length: total }).map((_, i) => (
+          <View
+            key={i}
+            style={[
+              stepStyles.dot,
+              {
+                backgroundColor: i <= current ? theme.primary : theme.border,
+                width: i === current ? 20 : 8,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <Text style={[stepStyles.label, { color: theme.textSecondary }]}>
+        Step {current + 1} of {total}
+      </Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -270,4 +374,18 @@ const styles = StyleSheet.create({
   errorTitle: { fontSize: 20, fontWeight: '700' },
   errorMessage: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
   errorRetry: { fontSize: 14, fontWeight: '600', marginTop: 8 },
+});
+
+const stepStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { height: 8, borderRadius: 4 },
+  label: { fontSize: 13, fontWeight: '600' },
 });

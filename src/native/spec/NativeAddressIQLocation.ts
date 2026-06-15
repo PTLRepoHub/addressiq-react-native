@@ -17,6 +17,11 @@ export interface Spec extends TurboModule {
   getPlatformVersion(): string;
   hasLocationPermission(): Promise<boolean>;
   hasBackgroundLocationPermission(): Promise<boolean>;
+  /** Maps OS authorization to cross-SDK contract permission strings. */
+  getLocationPermissionStatuses(): Promise<{
+    foreground: 'GRANTED' | 'DENIED' | 'BLOCKED' | 'NOT_DETERMINED' | 'UNAVAILABLE';
+    background: 'GRANTED' | 'DENIED' | 'BLOCKED' | 'NOT_DETERMINED' | 'UNAVAILABLE';
+  }>;
   requestLocationPermission(): Promise<boolean>;
   requestBackgroundLocationPermission(): Promise<boolean>;
   isMockLocationDetected(): Promise<boolean>;

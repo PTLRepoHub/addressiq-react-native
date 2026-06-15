@@ -165,12 +165,38 @@ export interface AddressData {
   plusCode?: string;
   streetviewPanoId?: string;
   streetviewHeading?: number;
+  streetviewLat?: number;
+  streetviewLon?: number;
 }
 
-/** Result returned by the `<IQLocationManager>` widget on completion. */
+/**
+ * Result returned by the `<IQLocationManager>` Collect UI on completion.
+ *
+ * The Collect UI **collects only** — it creates the address and returns its
+ * public `locationCode`. It does NOT start a verification. Start verification
+ * from this callback with `AddressIQ.startVerification({ locationCode })`
+ * (contract §collect-verify split). `locationCode` is the same code the
+ * imperative `start*` APIs accept.
+ */
+export interface CollectResult {
+  locationCode: string;
+  formattedAddress?: string;
+  lat: number;
+  lon: number;
+  placeId?: string;
+  /** True when the address de-duped to an existing nearby location. */
+  isExisting?: boolean;
+}
+
+/**
+ * Result returned by the imperative verify APIs (`startVerification` etc.).
+ *
+ * Uses the public codes the API returns (`verificationCode`, `locationCode`) —
+ * never internal UUIDs (contract §0.2, P0-4).
+ */
 export interface VerifyResult {
-  verificationId: string;
-  locationId: string;
+  verificationCode: string;
+  locationCode: string;
   status: string;
 }
 
@@ -292,9 +318,20 @@ export interface IQLocationManagerProps {
   firstName?: string;
   lastName?: string;
   email?: string;
+  /**
+   * Google Maps API key for the address map flow (Places autocomplete, map pin,
+   * reverse geocoding, Street View). When omitted the address step degrades to
+   * GPS + manual entry. Falls back to `initialize({ googleMapsApiKey })`.
+   */
+  googleMapsApiKey?: string;
   theme?: Partial<AddressIQTheme>;
   initialAddress?: Partial<AddressData>;
-  onComplete?: (result: VerifyResult) => void;
+  /**
+   * Fired when the address is collected. The Collect UI does NOT start a
+   * verification — call `AddressIQ.startVerification({ locationCode })` here to
+   * begin verification (host owns when verification starts).
+   */
+  onComplete?: (result: CollectResult) => void;
   onCancel?: () => void;
   onError?: (error: Error) => void;
   visible?: boolean;

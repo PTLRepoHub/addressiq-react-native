@@ -40,7 +40,26 @@ export interface StartCombinedArgs {
 export interface StartCombinedResult {
   verificationCode: string;
   status: string;
+  digitalVerificationCode: string;
+  physicalVerificationCode: string;
+  combinedVerificationId?: string;
   /** See `StartPhysicalResult.geofence`. */
+  geofence?: {
+    lat: number;
+    lon: number;
+    radiusM: number;
+  };
+}
+
+export interface StartVerificationArgs {
+  locationCode: string;
+  digitalProvider?: string;
+  idempotencyKey: string;
+}
+
+export interface StartVerificationResult {
+  verificationCode: string;
+  status: string;
   geofence?: {
     lat: number;
     lon: number;
@@ -108,30 +127,81 @@ export async function getStatus(verificationCode: string): Promise<VerificationR
 
 export async function startPhysical(args: StartPhysicalArgs): Promise<StartPhysicalResult> {
   const { apiUrl } = resolveUrls();
-  const res = await fetch(`${apiUrl}/api/v1/verifications/physical`, {
-    method: 'POST',
-    headers: buildHeaders({ 'idempotency-key': args.idempotencyKey }),
-    body: JSON.stringify({
-      locationCode: args.locationCode,
-      provider: args.provider,
-      appointmentSlot: args.appointmentSlot,
-    }),
-  });
-  return jsonOrThrow<StartPhysicalResult>(res);
+  const res = await fetch(
+    `${apiUrl}/api/v1/locations/${encodeURIComponent(args.locationCode)}/verifications/physical`,
+    {
+      method: 'POST',
+      headers: buildHeaders({ 'idempotency-key': args.idempotencyKey }),
+      body: JSON.stringify({
+        provider: args.provider,
+        ...(args.appointmentSlot ? { metadata: { appointmentSlot: args.appointmentSlot } } : {}),
+      }),
+    },
+  );
+  const raw = await jsonOrThrow<{
+    verificationCode: string;
+    status: string;
+    geofence?: StartPhysicalResult['geofence'];
+  }>(res);
+  return {
+    verificationCode: raw.verificationCode,
+    status: raw.status,
+    geofence: raw.geofence,
+  };
 }
 
 export async function startCombined(args: StartCombinedArgs): Promise<StartCombinedResult> {
   const { apiUrl } = resolveUrls();
-  const res = await fetch(`${apiUrl}/api/v1/verifications/combined`, {
-    method: 'POST',
-    headers: buildHeaders({ 'idempotency-key': args.idempotencyKey }),
-    body: JSON.stringify({
-      locationCode: args.locationCode,
-      digitalProvider: args.digitalProvider ?? 'internal_ai',
-      physicalProvider: args.physicalProvider,
-    }),
-  });
-  return jsonOrThrow<StartCombinedResult>(res);
+  const res = await fetch(
+    `${apiUrl}/api/v1/locations/${encodeURIComponent(args.locationCode)}/verifications/combined`,
+    {
+      method: 'POST',
+      headers: buildHeaders({ 'idempotency-key': args.idempotencyKey }),
+      body: JSON.stringify({
+        digitalProvider: args.digitalProvider ?? 'internal_ai',
+        physicalProvider: args.physicalProvider,
+      }),
+    },
+  );
+  const raw = await jsonOrThrow<{
+    combinedVerificationId?: string;
+    status: string;
+    digital: { verificationCode: string };
+    physical: { verificationCode: string };
+    geofence?: StartCombinedResult['geofence'];
+  }>(res);
+  return {
+    verificationCode: raw.digital.verificationCode,
+    status: raw.status,
+    digitalVerificationCode: raw.digital.verificationCode,
+    physicalVerificationCode: raw.physical.verificationCode,
+    combinedVerificationId: raw.combinedVerificationId,
+    geofence: raw.geofence,
+  };
+}
+
+export async function startVerification(args: StartVerificationArgs): Promise<StartVerificationResult> {
+  const { apiUrl } = resolveUrls();
+  const res = await fetch(
+    `${apiUrl}/api/v1/locations/${encodeURIComponent(args.locationCode)}/verifications/digital`,
+    {
+      method: 'POST',
+      headers: buildHeaders({ 'idempotency-key': args.idempotencyKey }),
+      body: JSON.stringify({
+        digitalProvider: args.digitalProvider ?? 'internal_ai',
+      }),
+    },
+  );
+  const raw = await jsonOrThrow<{
+    verificationCode: string;
+    status: string;
+    geofence?: StartVerificationResult['geofence'];
+  }>(res);
+  return {
+    verificationCode: raw.verificationCode,
+    status: raw.status,
+    geofence: raw.geofence,
+  };
 }
 
 export async function cancelVerification(

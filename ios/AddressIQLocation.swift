@@ -74,6 +74,15 @@ class AddressIQLocation: RCTEventEmitter, CLLocationManagerDelegate {
     resolve(currentAuthStatus() == .authorizedAlways)
   }
 
+  @objc(getLocationPermissionStatuses:rejecter:)
+  func getLocationPermissionStatuses(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    let status = currentAuthStatus()
+    resolve([
+      "foreground": Self.mapForegroundStatus(status),
+      "background": Self.mapBackgroundStatus(status),
+    ])
+  }
+
   @objc(requestLocationPermission:rejecter:)
   func requestLocationPermission(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     let status = currentAuthStatus()
@@ -302,6 +311,27 @@ class AddressIQLocation: RCTEventEmitter, CLLocationManagerDelegate {
       return manager.authorizationStatus
     }
     return CLLocationManager.authorizationStatus()
+  }
+
+  private static func mapForegroundStatus(_ status: CLAuthorizationStatus) -> String {
+    switch status {
+    case .authorizedAlways, .authorizedWhenInUse: return "GRANTED"
+    case .denied: return "DENIED"
+    case .restricted: return "BLOCKED"
+    case .notDetermined: return "NOT_DETERMINED"
+    @unknown default: return "UNAVAILABLE"
+    }
+  }
+
+  private static func mapBackgroundStatus(_ status: CLAuthorizationStatus) -> String {
+    switch status {
+    case .authorizedAlways: return "GRANTED"
+    case .authorizedWhenInUse: return "DENIED"
+    case .denied: return "DENIED"
+    case .restricted: return "BLOCKED"
+    case .notDetermined: return "NOT_DETERMINED"
+    @unknown default: return "UNAVAILABLE"
+    }
   }
 
   private func resolveAccuracy(_ name: String) -> CLLocationAccuracy {

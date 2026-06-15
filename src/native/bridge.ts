@@ -29,6 +29,10 @@ function buildFallback(): Spec {
     getPlatformVersion: () => `${Platform.OS}-${Platform.Version}-fallback`,
     hasLocationPermission: async () => false,
     hasBackgroundLocationPermission: async () => false,
+    getLocationPermissionStatuses: async () => ({
+      foreground: 'NOT_DETERMINED',
+      background: 'NOT_DETERMINED',
+    }),
     requestLocationPermission: async () => false,
     requestBackgroundLocationPermission: async () => false,
     isMockLocationDetected: async () => false,

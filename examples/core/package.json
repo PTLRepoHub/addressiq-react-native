@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Bare React Native example consuming the local @addressiq/react-native SDK.",
-  "main": "App.tsx",
+  "main": "index.js",
   "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -14,7 +17,16 @@
     "react-native": "0.74.5"
   },
   "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@babel/preset-env": "^7.20.0",
+    "@babel/runtime": "^7.20.0",
+    "@react-native/babel-preset": "0.74.87",
+    "@react-native/metro-config": "0.74.87",
+    "@react-native/typescript-config": "0.74.87",
     "@types/react": "~18.2.45",
     "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

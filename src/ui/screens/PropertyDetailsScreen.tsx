@@ -36,8 +36,6 @@ export default function PropertyDetailsScreen({ theme, address, onNext, onBack, 
       theme={theme}
       title="Property Details"
       subtitle="Help us identify your building"
-      step={2}
-      totalSteps={4}
       onBack={onBack}
       onClose={onCancel}
       footer={

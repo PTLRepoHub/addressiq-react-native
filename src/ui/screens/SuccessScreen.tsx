@@ -1,21 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
-import type { AddressIQTheme, VerifyResult } from '../../types';
+import type { AddressIQTheme, CollectResult } from '../../types';
 import Button from '../components/Button';
 import Icon from '../components/Icon';
 
 /**
- * Verification-started confirmation screen for the core (bare-RN) SDK.
+ * Address-collected confirmation screen for the core (bare-RN) SDK.
  *
- * Mirrors the Expo SDK's success screen but **does not register for
- * push notifications** — bare-RN partners typically already have their
- * own push setup (Firebase, OneSignal, native APNS/FCM glue). The SDK
- * exposes `getVerificationStatus()` + `onStatusChange()` so partners
- * can pipe their existing push handler into the lifecycle.
+ * The Collect UI collects only — it does not start a verification. This screen
+ * confirms the address was saved and surfaces the `locationCode`; the host
+ * begins verification from `onComplete` via `startVerification({ locationCode })`.
  */
 interface Props {
   theme: AddressIQTheme;
-  result: VerifyResult;
+  result: CollectResult;
   onDone: () => void;
 }
 
@@ -38,20 +36,20 @@ export default function SuccessScreen({ theme, result, onDone }: Props) {
         </Animated.View>
 
         <Animated.View style={[styles.textBlock, { opacity: fade }]}>
-          <Text style={[styles.title, { color: theme.text }]}>Verification Started</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Address Collected</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>
-            We're now verifying your address. This typically takes 2-7 days. You'll be notified when it's complete.
+            Your address has been saved. {result.formattedAddress ?? ''}
           </Text>
 
           <View style={[styles.tipCard, { backgroundColor: theme.primaryLight }]}>
             <Icon name="bulb" size={20} color={theme.primary} />
             <Text style={[styles.tipText, { color: theme.text }]}>
-              Keep your location services turned on and don't force-close this app for the best results
+              Keep your location services turned on so verification can confirm you live here
             </Text>
           </View>
 
           <Text style={[styles.refCode, { color: theme.textSecondary }]}>
-            Reference: {result.verificationId}
+            Reference: {result.locationCode}
           </Text>
         </Animated.View>
       </View>
