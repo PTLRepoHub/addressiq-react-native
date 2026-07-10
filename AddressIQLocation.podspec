@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.license      = { :type => 'UNLICENSED' }
   s.authors      = { 'AddressIQ' => 'engineering@addressiqpro.com' }
   s.platforms    = { :ios => '13.0' }
-  s.source       = { :git => 'https://github.com/addressiq/sdk-react-native.git', :tag => "v#{s.version}" }
+  s.source       = { :git => 'https://github.com/PTLRepoHub/addressiq-react-native.git', :tag => "v#{s.version}" }
 
   s.source_files = 'ios/**/*.{h,m,mm,swift}'
   s.swift_version = '5.0'
