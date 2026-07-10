@@ -109,6 +109,20 @@ class AddressIQLocation: RCTEventEmitter, CLLocationManagerDelegate {
     }
   }
 
+  @objc(requestFullAccuracy:resolver:rejecter:)
+  func requestFullAccuracy(purposeKey: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    // iOS 14+ precise-vs-approximate. `purposeKey` must match an entry in the
+    // host app's Info.plist NSLocationTemporaryUsageDescriptionDictionary.
+    if #available(iOS 14.0, *) {
+      if manager.accuracyAuthorization == .fullAccuracy { resolve(true); return }
+      manager.requestTemporaryFullAccuracyAuthorization(withPurposeKey: purposeKey) { [weak self] _ in
+        resolve(self?.manager.accuracyAuthorization == .fullAccuracy)
+      }
+    } else {
+      resolve(true) // iOS < 14 is always full accuracy.
+    }
+  }
+
   @objc(isMockLocationDetected:rejecter:)
   func isMockLocationDetected(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
     // iOS does not expose a public mock-location flag at the capability

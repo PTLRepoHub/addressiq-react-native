@@ -88,6 +88,9 @@ let statusListeners: StatusChangeCallback[] = [];
 /** Tracks Android permission prompts so BLOCKED can be distinguished from NOT_DETERMINED. */
 let androidFgPermissionPrompted = false;
 let androidBgPermissionPrompted = false;
+/** Set once foreground location is permanently denied — further prompts hang/no-op,
+ * so we short-circuit instead of re-requesting. */
+let androidLocationBlocked = false;
 
 // ── Public API ──
 
@@ -204,31 +207,92 @@ export async function checkDeviceCapabilities(): Promise<DeviceCapabilities> {
  * succeed. A partial grant (foreground only) returns false; the host
  * app can still call `getCurrentLocation()` in that case.
  */
+/** Resolve `p`, or `fallback` if it doesn't settle within `ms` (never rejects). */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
+/**
+ * Request FOREGROUND precise location only — Android FINE+COARSE, iOS WhenInUse +
+ * temporary full accuracy. This is all a one-shot fix / address collection needs.
+ * It never touches background/Always, so it can't hang when background location
+ * is permanently denied. Returns true when foreground (precise) is granted.
+ */
+export async function requestForegroundLocation(purposeKey = 'AddressVerification'): Promise<boolean> {
+  const { Platform, PermissionsAndroid } = require('react-native') as {
+    Platform: { OS: string };
+    PermissionsAndroid: {
+      PERMISSIONS: Record<string, string>;
+      RESULTS: { GRANTED: string; NEVER_ASK_AGAIN: string };
+      requestMultiple: (perms: string[]) => Promise<Record<string, string>>;
+      check: (perm: string) => Promise<boolean>;
+    };
+  };
+  if (Platform.OS === 'android') {
+    const FINE = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+    // Fast path: already granted — never prompt (and never risk a hang).
+    if (await PermissionsAndroid.check(FINE)) return true;
+    // Once permanently denied, the OS shows no dialog and requesting again just
+    // hangs — so short-circuit and let the caller send the user to Settings.
+    if (androidLocationBlocked) return false;
+    androidFgPermissionPrompted = true;
+    // TIME-BOX the prompt. When the permission was permanently denied ("Don't
+    // allow" chosen previously → USER_FIXED), Android logs "No requestable
+    // permission" and NEVER fires the result callback, so requestMultiple would
+    // hang forever — freezing the UI with no response. Resolve to "not granted"
+    // if it stalls, and remember it so the next tap responds instantly.
+    const fg = await withTimeout(
+      PermissionsAndroid.requestMultiple([FINE, PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION]),
+      12000,
+      {} as Record<string, string>,
+    );
+    const result = fg[FINE];
+    if (result === undefined || result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+      androidLocationBlocked = true; // stalled (permanently denied) or never-ask-again
+    }
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  }
+  const native = getNativeModule();
+  const fg = await native.requestLocationPermission();
+  try {
+    await native.requestFullAccuracy(purposeKey);
+  } catch {
+    // iOS < 14 / no native module — foreground grant is what matters.
+  }
+  return fg;
+}
+
 export async function requestPermissions(): Promise<boolean> {
   const { Platform, PermissionsAndroid } = require('react-native') as {
     Platform: { OS: string; Version: number };
     PermissionsAndroid: {
       PERMISSIONS: Record<string, string>;
       RESULTS: { GRANTED: string };
-      requestMultiple: (perms: string[]) => Promise<Record<string, string>>;
       request: (perm: string) => Promise<string>;
+      check: (perm: string) => Promise<boolean>;
     };
   };
 
   if (Platform.OS === 'android') {
-    const fg = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-    ]);
-    androidFgPermissionPrompted = true;
-    const fineGranted =
-      fg[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
+    const fineGranted = await requestForegroundLocation();
     if (!fineGranted) return false;
     if (Platform.Version >= 29) {
-      const bg = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
-      );
+      // Background must be requested AFTER foreground (Google policy). If it's
+      // already granted, we're done. Otherwise request it, but TIME-BOX the call:
+      // on some OS versions requesting a permanently-denied background permission
+      // never fires its result callback and would hang the entire location flow.
+      if (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION)) {
+        return true;
+      }
       androidBgPermissionPrompted = true;
+      const bg = await withTimeout(
+        PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION),
+        8000,
+        'denied', // treated as not-granted if the request never resolves
+      );
       return bg === PermissionsAndroid.RESULTS.GRANTED;
     }
     return true;
@@ -238,6 +302,28 @@ export async function requestPermissions(): Promise<boolean> {
   const fg = await native.requestLocationPermission();
   if (!fg) return false;
   return native.requestBackgroundLocationPermission();
+}
+
+/**
+ * Request the combination address verification needs: precise + background/Always.
+ * Runs the foreground+background chain, then on iOS 14+ requests **temporary full
+ * accuracy** (the precise toggle) — Android FINE is already precise. Cross-SDK
+ * parity with the native iOS/Android `requestPreciseAndAlways`. Returns the
+ * foreground+background grant result.
+ */
+export async function requestPreciseAndAlways(
+  purposeKey = 'AddressVerification',
+): Promise<boolean> {
+  const granted = await requestPermissions();
+  const { Platform } = require('react-native') as { Platform: { OS: string } };
+  if (Platform.OS === 'ios') {
+    try {
+      await getNativeModule().requestFullAccuracy(purposeKey);
+    } catch {
+      // Accuracy prompt unavailable (iOS < 14 / no native module) — not fatal.
+    }
+  }
+  return granted;
 }
 
 /**

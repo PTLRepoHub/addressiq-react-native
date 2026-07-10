@@ -25,7 +25,8 @@ bare-RN and Expo apps.
 
 ```bash
 npm install @addressiq/react-native
-# iOS: cd ios && pod install
+# iOS:     cd ios && pod install
+# Android: nothing extra — Gradle autolinks the native module
 ```
 
 React Native ≥ 0.72 (TurboModule codegen). Runs in Expo via a dev build (not Expo Go — the SDK ships native code).
@@ -149,13 +150,25 @@ cp src/config/credentials.template.json src/config/credentials.json
 #                         address step degrades to GPS + manual entry without it)
 #   credentials.json is gitignored; the template is the only tracked file.
 
-# 2. Install + native link
+# 2. Install dependencies + native link
 npm install
+#   iOS: install CocoaPods. Android needs NO equivalent step — React Native
+#   autolinks the SDK's native module through Gradle at build time.
 cd ios && pod install && cd ..      # iOS only
 
 # 3. Launch (Metro starts automatically)
-npm run ios                          # or: npm run android
+npm run ios          # iOS  — boots a Simulator (or a connected device)
+npm run android      # Android — needs a running emulator or connected device
 ```
+
+**iOS prerequisites:** Xcode + CocoaPods (`sudo gem install cocoapods` or `brew install cocoapods`).
+
+**Android prerequisites:** Android Studio (SDK + platform tools) and **JDK 17**. Start an
+emulator (Android Studio ▸ Device Manager) or plug in a device with USB debugging,
+then `npm run android`. The Android SDK path is read from `$ANDROID_HOME` or
+`android/local.properties` — no `pod install`-style step is needed; Gradle autolinks
+the SDK. If the build can't find the SDK, create `examples/core/android/local.properties`
+with `sdk.dir=/Users/<you>/Library/Android/sdk`.
 
 Pick the environment (`staging` / `local` / `production`) on the **Login**
 screen — it selects the API + ingest hosts. Use `local` only when the

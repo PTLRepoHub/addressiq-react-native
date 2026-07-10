@@ -35,6 +35,7 @@ function buildFallback(): Spec {
     }),
     requestLocationPermission: async () => false,
     requestBackgroundLocationPermission: async () => false,
+    requestFullAccuracy: async () => true,
     isMockLocationDetected: async () => false,
     getCurrentLocation: (highAccuracy: boolean) =>
       new Promise((resolve, reject) => {

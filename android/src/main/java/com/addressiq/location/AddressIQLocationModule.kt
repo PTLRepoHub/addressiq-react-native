@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Build
+import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
@@ -25,6 +26,8 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Native AddressIQ Location module — signal-driven, never polled.
@@ -78,6 +81,21 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
 
   @ReactMethod
   fun hasLocationPermission(promise: Promise) {
+    promise.resolve(
+      ContextCompat.checkSelfPermission(reactCtx, Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED,
+    )
+  }
+
+  /**
+   * iOS has a precise/approximate accuracy toggle; on Android, FINE location IS
+   * precise, so there is nothing extra to prompt — this just reports whether
+   * FINE (precise) is granted. `purposeKey` is accepted for cross-platform API
+   * symmetry and ignored here.
+   */
+  @ReactMethod
+  @Suppress("UNUSED_PARAMETER") // purposeKey is iOS-only; kept for cross-platform API symmetry.
+  fun requestFullAccuracy(purposeKey: String, promise: Promise) {
     promise.resolve(
       ContextCompat.checkSelfPermission(reactCtx, Manifest.permission.ACCESS_FINE_LOCATION) ==
         PackageManager.PERMISSION_GRANTED,
@@ -144,15 +162,50 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
       promise.reject("E_PERMISSION", "Location permission not granted"); return
     }
     val priority = if (highAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY
+
+    // A fresh fix can be null (emulator / no active provider) or slow (indoors,
+    // cold start). Cap the wait, and if it doesn't produce a location fall back
+    // to the last known one so "Use my current location" still resolves.
+    val settled = AtomicBoolean(false)
+    val cts = CancellationTokenSource()
+    val timeoutHandler = Handler(Looper.getMainLooper())
+    val timeoutRunnable = Runnable { cts.cancel() } // → getCurrentLocation fails → fallback
+
+    fun settleResolve(loc: Location) {
+      if (settled.compareAndSet(false, true)) {
+        timeoutHandler.removeCallbacksAndMessages(null)
+        promise.resolve(serialize(loc))
+      }
+    }
+    fun settleReject(code: String, message: String?, e: Exception?) {
+      if (settled.compareAndSet(false, true)) {
+        timeoutHandler.removeCallbacksAndMessages(null)
+        promise.reject(code, message, e)
+      }
+    }
+
+    fun fallbackToLastKnown() {
+      try {
+        fusedClient.lastLocation
+          .addOnSuccessListener { last: Location? ->
+            if (last != null) settleResolve(last)
+            else settleReject("E_NO_LOCATION", "No location available", null)
+          }
+          .addOnFailureListener { e -> settleReject("E_LOCATION_FAIL", e.message, e) }
+      } catch (e: SecurityException) {
+        settleReject("E_PERMISSION", e.message, e)
+      }
+    }
+
     try {
-      fusedClient.getCurrentLocation(priority, null)
+      timeoutHandler.postDelayed(timeoutRunnable, 10_000)
+      fusedClient.getCurrentLocation(priority, cts.token)
         .addOnSuccessListener { loc: Location? ->
-          if (loc == null) promise.reject("E_NO_LOCATION", "No location available")
-          else promise.resolve(serialize(loc))
+          if (loc != null) settleResolve(loc) else fallbackToLastKnown()
         }
-        .addOnFailureListener { e -> promise.reject("E_LOCATION_FAIL", e.message, e) }
+        .addOnFailureListener { _ -> fallbackToLastKnown() }
     } catch (e: SecurityException) {
-      promise.reject("E_PERMISSION", e.message, e)
+      settleReject("E_PERMISSION", e.message, e)
     }
   }
 

@@ -10,8 +10,8 @@ interface Props {
 const ENVIRONMENTS: Environment[] = ['staging', 'local', 'production'];
 
 export default function LoginScreen({ onLogin }: Props) {
-  const [environment, setEnvironment] = useState<Environment>('staging');
-  const [appUserId, setAppUserId] = useState(__DEV__ ? 'cust_sample_001' : '');
+  const [environment, setEnvironment] = useState<Environment>('local');
+  const [appUserId, setAppUserId] = useState(__DEV__ ? 'cust_e2e_001' : '');
   const [firstName, setFirstName] = useState(__DEV__ ? 'Demo' : '');
   const [lastName, setLastName] = useState(__DEV__ ? 'User' : '');
   const [email, setEmail] = useState(__DEV__ ? 'demo@addressiq.test' : '');

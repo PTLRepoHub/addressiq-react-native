@@ -335,4 +335,10 @@ export interface IQLocationManagerProps {
   onCancel?: () => void;
   onError?: (error: Error) => void;
   visible?: boolean;
+  /** Business display name shown on the intro/consent screens of the widget. */
+  businessName?: string;
+  /** Override the hosted widget bundle URL (for local development). */
+  widgetUrl?: string;
+  /** Override the resolved API base URL (for local development / mock upstream). */
+  apiUrlOverride?: string;
 }

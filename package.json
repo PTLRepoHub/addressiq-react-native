@@ -23,6 +23,8 @@
     "lint": "eslint src",
     "type-check": "tsc --noEmit",
     "example:core": "npm --prefix examples/core install && npm --prefix examples/core run type-check",
+    "example:core:ios": "npm --prefix examples/core install && npm --prefix examples/core run ios",
+    "example:core:android": "npm --prefix examples/core install && npm --prefix examples/core run android",
     "example:expo": "npm --prefix examples/expo install && npm --prefix examples/expo start"
   },
   "peerDependencies": {
@@ -65,5 +67,6 @@
     "geolocation",
     "kyc",
     "fraud-detection"
-  ]
+  ],
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

@@ -24,6 +24,13 @@ export interface Spec extends TurboModule {
   }>;
   requestLocationPermission(): Promise<boolean>;
   requestBackgroundLocationPermission(): Promise<boolean>;
+  /**
+   * iOS 14+ precise ("full") accuracy. Prompts for temporary full accuracy when
+   * the user granted approximate; resolves true once full accuracy is authorized
+   * (always true on Android, where FINE is precise, and on iOS < 14).
+   * `purposeKey` must match an Info.plist NSLocationTemporaryUsageDescriptionDictionary entry.
+   */
+  requestFullAccuracy(purposeKey: string): Promise<boolean>;
   isMockLocationDetected(): Promise<boolean>;
 
   // Foreground reading

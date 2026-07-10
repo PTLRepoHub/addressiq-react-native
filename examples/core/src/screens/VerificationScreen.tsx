@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   Pressable,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   initialize,
@@ -14,6 +15,7 @@ import {
   startVerification,
   startPhysicalVerification,
   startDigitalAndPhysicalVerification,
+  cancelVerification,
   getVerificationState,
   onStatusChange,
   isNativeLinked,
@@ -30,7 +32,10 @@ import ResultModal from '../components/ResultModal';
 import SettingsSheet from '../components/SettingsSheet';
 import { loadAddresses, saveAddress, type SessionData } from '../storage';
 
-type Creds = Record<string, { apiKey: string; googleMapsApiKey?: string }>;
+type Creds = Record<
+  string,
+  { apiKey: string; googleMapsApiKey?: string; apiUrl?: string; businessName?: string }
+>;
 
 function loadCredentials(): Creds {
   try {
@@ -77,6 +82,13 @@ export default function VerificationScreen({
   // autocomplete + Street View). Without it the address step shows the Apple
   // Maps pin + manual entry.
   const googleMapsApiKey = creds?.googleMapsApiKey;
+  // Point at a local backend for development. The Android emulator reaches the
+  // host via 10.0.2.2; the iOS simulator reaches it via localhost. credentials.json
+  // stores the Android form, so swap the host on iOS.
+  const apiUrl =
+    Platform.OS === 'ios' ? creds?.apiUrl?.replace('10.0.2.2', 'localhost') : creds?.apiUrl;
+  // Fallback name only — the widget fetches the real business identity from the backend.
+  const businessName = creds?.businessName;
 
   const refreshSaved = useCallback(async () => {
     const list = await loadAddresses();
@@ -92,7 +104,11 @@ export default function VerificationScreen({
     let cancelled = false;
     (async () => {
       try {
-        initialize({ apiKey, environment: session.environment });
+        // Pass apiUrl so the NATIVE SDK path (digital verification, status, etc.)
+        // hits the same host as the widget. Without it, the `local` env defaults
+        // to http://localhost:4000, which is unreachable from the Android emulator
+        // (localhost = the emulator itself) → "Network request failed".
+        initialize({ apiKey, environment: session.environment, apiUrl });
         await setUser({
           appUserId: session.appUserId,
           firstName: session.firstName,
@@ -121,11 +137,38 @@ export default function VerificationScreen({
   const runFlow = async (title: string, fn: () => Promise<unknown>, type?: string) => {
     setBusy(title);
     try {
+      // The SDK allows ONE active verification at a time. For easy testing, if one
+      // is already collecting, cancel it first so a different type can start.
+      // (A production app would keep the single active verification instead.)
+      if (getVerificationState().state === 'COLLECTING' && activeVerification.current) {
+        try {
+          await cancelVerification(activeVerification.current);
+          activeVerification.current = null;
+        } catch (ce) {
+          // Couldn't clear the active verification — surface it plainly instead of
+          // proceeding into a confusing "lifecycle is COLLECTING" error.
+          setModal({
+            title: `${title} — blocked`,
+            payload: {
+              note: 'A verification is already active and it could not be cancelled, so a new one cannot start.',
+              cancelError: formatError(ce),
+            },
+            type,
+          });
+          return;
+        }
+      }
       const result = await fn();
+      // Persist the now-verified address so it shows in the Saved Addresses list.
+      const vr = result as Partial<VerifyResult>;
+      if (savedLocation && vr?.verificationCode) {
+        await saveAddress({ verificationCode: vr.verificationCode, locationCode: savedLocation, status: vr.status ?? 'PENDING' });
+      }
       setModal({ title, payload: result, type });
       setLifecycle(getVerificationState().state);
     } catch (e) {
       setModal({ title: `${title} — Error`, payload: formatError(e), type });
+      setLifecycle(getVerificationState().state);
     } finally {
       setBusy(null);
     }
@@ -134,21 +177,22 @@ export default function VerificationScreen({
   const onWidgetComplete = async (result: CollectResult) => {
     setWidgetOpen(false);
     setSavedLocation(result.locationCode);
-    // The Collect UI collects only — it does NOT start a verification. The host
-    // owns when verification begins, so start it here from the success callback.
-    try {
-      const verification = await startVerification({ locationCode: result.locationCode });
-      activeVerification.current = verification.verificationCode;
-      const saved: VerifyResult = {
-        verificationCode: verification.verificationCode,
-        locationCode: result.locationCode,
-        status: verification.status,
-      };
-      await saveAddress(saved);
-      setModal({ title: 'Address collected → verification started', payload: saved, type: 'DIGITAL' });
-    } catch (e) {
-      setModal({ title: 'Address collected · verification failed', payload: formatError(e), type: 'DIGITAL' });
-    }
+    // Collect and verify are DECOUPLED. The widget only captures the address and
+    // returns a locationCode — it does NOT verify. The host decides when/how to
+    // verify, so here we just save the collected address and let the user pick a
+    // verification type in Step 2 below (rather than auto-starting one, which
+    // would immediately put the SDK into COLLECTING).
+    const collected: VerifyResult = {
+      verificationCode: '',
+      locationCode: result.locationCode,
+      status: 'COLLECTED',
+    };
+    await saveAddress(collected);
+    setModal({
+      title: 'Address collected',
+      payload: { locationCode: result.locationCode, next: 'Pick a verification below (Step 2).' },
+      type: 'DIGITAL',
+    });
     setLifecycle(getVerificationState().state);
   };
 
@@ -182,7 +226,7 @@ export default function VerificationScreen({
       <ScrollView showsVerticalScrollIndicator={false}>
         <Card
           title="Step 1 — Collect an address"
-          subtitle="Opens the AddressIQ widget. Same as OkHi's createAddress flow — capture location and property details."
+          subtitle="Opens the AddressIQ widget — intro, business consent, pick a saved address or add a new one, then verify."
         >
           <Button
             label={busy === 'Collect' ? 'Opening…' : 'Collect Address'}
@@ -265,6 +309,8 @@ export default function VerificationScreen({
         visible={widgetOpen}
         apiKey={apiKey}
         googleMapsApiKey={googleMapsApiKey}
+        apiUrlOverride={apiUrl}
+        businessName={businessName}
         environment={session.environment}
         appUserId={session.appUserId}
         firstName={session.firstName}
