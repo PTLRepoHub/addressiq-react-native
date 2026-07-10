@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.2.0...v0.3.0) (2026-07-10)
+
+
+### Features
+
+* **proto:** regen against proto v0.1.0 ([#2](https://github.com/PTLRepoHub/addressiq-react-native/issues/2)) ([6422d32](https://github.com/PTLRepoHub/addressiq-react-native/commit/6422d32c0d05b4029c3e73c7e6bb3eda0a239756))
+
 ## [0.2.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.1.0...v0.2.0) (2026-07-10)
 
 
