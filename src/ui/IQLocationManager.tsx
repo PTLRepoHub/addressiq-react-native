@@ -21,7 +21,18 @@ import { routeBridgeMessage } from './bridgeRouter';
  *     { kind: 'request', id, action, payload }
  *   native → JS: `window.AddressIQBridge.resolve(id, result)` / `.reject(id, err)`
  */
-const DEFAULT_WIDGET_URL = 'https://cdn.addressiq.com/v0.1.0/iqcollect.js';
+/**
+ * There is deliberately NO default remote widget URL.
+ *
+ * The widget ships bundled (see `widgetBundle.ts`, generated from
+ * @addressiq/iqcollect-web). If that bundle is missing the package is broken,
+ * and silently fetching a script from a CDN into this WebView — alongside the
+ * session config — would turn a packaging bug into remote code execution.
+ * We fail closed instead.
+ *
+ * `props.widgetUrl` remains supported as an explicit developer override for
+ * serving a local bundle during development.
+ */
 
 export default function IQLocationManager(props: IQLocationManagerProps) {
   const webRef = useRef<WebView>(null);
@@ -39,7 +50,7 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
     });
     return props.apiUrlOverride ?? resolveUrls().apiUrl;
   }, [props.apiKey, props.environment, props.googleMapsApiKey, props.apiUrlOverride]);
-  const widgetUrl = props.widgetUrl ?? DEFAULT_WIDGET_URL;
+  const widgetUrl = props.widgetUrl;
 
   const html = useMemo(
     () => buildHtml({
@@ -149,7 +160,7 @@ function buildHtml(cfg: {
   apiUrl: string;
   appUserId: string;
   businessName?: string;
-  widgetUrl: string;
+  widgetUrl?: string;
 }): string {
   // Business identity is fetched by the widget from the backend (tenant behind
   // the API key). Only forward a client-supplied fallback name if provided.
@@ -161,11 +172,21 @@ function buildHtml(cfg: {
     platform: Platform.OS === 'ios' ? 'ios' : 'android',
   };
   if (cfg.businessName) config.business = { displayName: cfg.businessName };
-  // Prefer the bundled widget (offline, version-pinned); fall back to the
-  // hosted bundle only if the embedded copy is somehow empty.
-  const widgetScript = WIDGET_JS
-    ? `<script>${WIDGET_JS}</script>`
-    : `<script src="${cfg.widgetUrl}"></script>`;
+  // Prefer the bundled widget (offline, version-pinned). An explicit
+  // `widgetUrl` override is honoured for local development. With neither, fail
+  // closed rather than reaching for a CDN — see the note on DEFAULT_WIDGET_URL.
+  let widgetScript: string;
+  if (WIDGET_JS) {
+    widgetScript = `<script>${WIDGET_JS}</script>`;
+  } else if (cfg.widgetUrl) {
+    widgetScript = `<script src="${cfg.widgetUrl}"></script>`;
+  } else {
+    throw new Error(
+      '[AddressIQ] The bundled widget (widgetBundle.ts) is empty and no `widgetUrl` ' +
+      'override was supplied. This is a packaging bug — reinstall @addressiq/react-native. ' +
+      'The SDK will not load the widget from a remote host.',
+    );
+  }
   return `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <style>html,body{margin:0;height:100%;background:#fff}#mount{min-height:100%}</style>
