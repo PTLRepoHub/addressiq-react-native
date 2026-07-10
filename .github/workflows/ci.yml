@@ -18,6 +18,10 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npm test
+      # Type-check the library itself, not just the examples. This was missing,
+      # so `npm run type-check` sat red on main (react-native-webview was a
+      # peerDependency only, so tsc could not resolve it).
+      - run: npm run type-check
       # Both examples link to the local SDK via `file:../..`; type-check each.
       - run: npm --prefix examples/core install
       - run: npm --prefix examples/core run type-check
