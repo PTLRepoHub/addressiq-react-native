@@ -1,6 +1,6 @@
 {
   "name": "@addressiq/react-native",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AddressIQ core React Native SDK (bare workflow — no Expo dependency). Address collect + verify lifecycle. Also usable from Expo apps via a dev build.",
   "publishConfig": {
     "access": "public"
