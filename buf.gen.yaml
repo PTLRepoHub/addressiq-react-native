@@ -6,7 +6,7 @@ version: v2
 #     - module: buf.build/addressiq/addressiq
 inputs:
   - git_repo: https://github.com/PTLRepoHub/AddressIq-proto.git
-    branch: main
+    tag: v0.1.0
 plugins:
   # Type-only bindings: the web SDK speaks REST/JSON, so it needs the message
   # shapes and enums, not protobuf binary encode/decode. onlyTypes keeps the
