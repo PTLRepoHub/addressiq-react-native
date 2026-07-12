@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.4.0...v0.5.0) (2026-07-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* removed apiUrl / ingestUrl from AddressIQConfig and apiUrlOverride from IQLocationManager. Select a host via `environment` (production | staging | development); production is provisioned at build time.
+
+### Features
+
+* provision API URL (+ web: Maps key) at build time from GH env ([#7](https://github.com/PTLRepoHub/addressiq-react-native/issues/7)) ([41196dc](https://github.com/PTLRepoHub/addressiq-react-native/commit/41196dc7a0e687819dd75139ba6fce09cc237c29))
+
 ## [0.4.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.3.0...v0.4.0) (2026-07-12)
 
 
