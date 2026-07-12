@@ -71,7 +71,7 @@ Keyed by environment (`production` / `staging` / `local`):
   works for both. On a **real device**, use your computer's LAN IP.
 - **The address map key** (Places autocomplete + Street View) is **provisioned by
   the platform** and fetched by the widget via `/widget/config` — you do **not**
-  set a Google Maps or Mapbox key in `credentials.json`. If the platform has no
+  set a Google Maps key in `credentials.json`. If the platform has no
   valid map key configured, the map step shows *"Oops! Something went wrong"* (see
   Troubleshooting).
 - **`businessName`** — a **fallback only**. Branding (name, logo, colours, button

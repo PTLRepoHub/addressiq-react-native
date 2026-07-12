@@ -78,7 +78,7 @@ import { IQLocationManager, startVerification } from '@addressiq/react-native';
 
 The platform provisions the map key automatically — the widget fetches it from
 the backend via `GET /api/v1/widget/config`, so integrators do **not** supply a
-Google Maps or Mapbox key. When a key is configured on the platform, the address
+Google Maps key. When a key is configured on the platform, the address
 step uses the map flow:
 
 - **Current location** or **Places Autocomplete** search to set the point,
@@ -150,7 +150,7 @@ cp src/config/credentials.template.json src/config/credentials.json
 #     - apiKey:           tenant key per environment (the `staging`/`local`
 #                         entries are pre-seeded with aiq_test_demo_bank_seed01)
 #   The map + Street View key is provisioned by the platform (fetched via
-#   `/widget/config`) — no integrator-supplied Maps/Mapbox key is required.
+#   `/widget/config`) — no integrator-supplied Google Maps key is required.
 #   credentials.json is gitignored; the template is the only tracked file.
 
 # 2. Install dependencies + native link
