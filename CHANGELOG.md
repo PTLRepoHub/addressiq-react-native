@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.7.0...v0.8.0) (2026-07-12)
+
+
+### Features
+
+* per-environment build config and CDN widget loading ([#14](https://github.com/PTLRepoHub/addressiq-react-native/issues/14)) ([0a5e629](https://github.com/PTLRepoHub/addressiq-react-native/commit/0a5e6293c477f76d639723770f7cebfd1bbf8217))
+* **widget:** re-vendor iqcollect.js from web v0.5.1 ([#17](https://github.com/PTLRepoHub/addressiq-react-native/issues/17)) ([b067ade](https://github.com/PTLRepoHub/addressiq-react-native/commit/b067ade2e93a556342fda92c41ac3830d598314c))
+
 ## [0.7.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.6.0...v0.7.0) (2026-07-12)
 
 
