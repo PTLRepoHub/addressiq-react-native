@@ -12,7 +12,7 @@ const KEYS = {
   addresses: 'aiq_verified_addresses',
 } as const;
 
-export type Environment = 'production' | 'staging' | 'local';
+export type Environment = 'production' | 'staging' | 'development';
 
 export interface SessionData {
   environment: Environment;

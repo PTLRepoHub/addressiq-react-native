@@ -7,7 +7,7 @@
  */
 
 /** Target environment for the SDK. */
-export type AddressIQEnvironment = 'production' | 'staging' | 'local';
+export type AddressIQEnvironment = 'production' | 'staging' | 'development';
 
 /** Resolved per-environment URLs the SDK talks to. */
 export interface EnvironmentURLs {
@@ -21,10 +21,6 @@ export interface EnvironmentURLs {
 export interface AddressIQConfig {
   /** Tenant API key (issued from the AddressIQ dashboard). */
   apiKey: string;
-  /** Override the API base URL. Defaults to environment-specific URL. */
-  apiUrl?: string;
-  /** Override the ingest URL. Defaults to environment-specific URL. */
-  ingestUrl?: string;
   /** Target environment. Defaults to 'production'. */
   environment?: AddressIQEnvironment;
 }
@@ -329,6 +325,4 @@ export interface IQLocationManagerProps {
   businessName?: string;
   /** Override the hosted widget bundle URL (for local development). */
   widgetUrl?: string;
-  /** Override the resolved API base URL (for local development / mock upstream). */
-  apiUrlOverride?: string;
 }

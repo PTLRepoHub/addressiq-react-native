@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   Pressable,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import {
   initialize,
@@ -34,7 +33,7 @@ import { loadAddresses, saveAddress, type SessionData } from '../storage';
 
 type Creds = Record<
   string,
-  { apiKey: string; apiUrl?: string; businessName?: string }
+  { apiKey: string; businessName?: string }
 >;
 
 function loadCredentials(): Creds {
@@ -80,11 +79,8 @@ export default function VerificationScreen({
   const apiKey = creds?.apiKey ?? '';
   // The map key is provisioned by the platform via GET /api/v1/widget/config;
   // the example does not supply one.
-  // Point at a local backend for development. The Android emulator reaches the
-  // host via 10.0.2.2; the iOS simulator reaches it via localhost. credentials.json
-  // stores the Android form, so swap the host on iOS.
-  const apiUrl =
-    Platform.OS === 'ios' ? creds?.apiUrl?.replace('10.0.2.2', 'localhost') : creds?.apiUrl;
+  // The API host is derived entirely from `environment`. Use `development` for a
+  // local backend (SDK resolves the emulator-aware :3355 loopback automatically).
   // Fallback name only — the widget fetches the real business identity from the backend.
   const businessName = creds?.businessName;
 
@@ -102,11 +98,9 @@ export default function VerificationScreen({
     let cancelled = false;
     (async () => {
       try {
-        // Pass apiUrl so the NATIVE SDK path (digital verification, status, etc.)
-        // hits the same host as the widget. Without it, the `local` env defaults
-        // to http://localhost:4000, which is unreachable from the Android emulator
-        // (localhost = the emulator itself) → "Network request failed".
-        initialize({ apiKey, environment: session.environment, apiUrl });
+        // The host is resolved from `environment` alone — `development` maps to
+        // the emulator-aware :3355 loopback (10.0.2.2 on Android, localhost on iOS).
+        initialize({ apiKey, environment: session.environment });
         await setUser({
           appUserId: session.appUserId,
           firstName: session.firstName,
@@ -306,7 +300,6 @@ export default function VerificationScreen({
       <IQLocationManager
         visible={widgetOpen}
         apiKey={apiKey}
-        apiUrlOverride={apiUrl}
         businessName={businessName}
         environment={session.environment}
         appUserId={session.appUserId}

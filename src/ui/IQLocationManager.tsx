@@ -38,17 +38,15 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
   const webRef = useRef<WebView>(null);
 
   const apiUrl = useMemo(() => {
-    // setConfig REPLACES the global config, so forward apiUrlOverride here too —
-    // otherwise opening the widget wipes the apiUrl that `initialize()` set, and
-    // the native SDK path (digital verification) falls back to the localhost
-    // default and fails on the Android emulator.
+    // setConfig REPLACES the global config; re-establish it from this widget's
+    // props so the native SDK path (digital verification) and the widget resolve
+    // the same environment-derived host.
     setConfig({
       apiKey: props.apiKey,
       environment: props.environment ?? 'production',
-      apiUrl: props.apiUrlOverride,
     });
-    return props.apiUrlOverride ?? resolveUrls().apiUrl;
-  }, [props.apiKey, props.environment, props.apiUrlOverride]);
+    return resolveUrls().apiUrl;
+  }, [props.apiKey, props.environment]);
   const widgetUrl = props.widgetUrl;
 
   const html = useMemo(
