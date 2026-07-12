@@ -78,6 +78,24 @@ inject these.
 `development` is deliberately **not** baked — it points at the host machine's
 backend and stays the emulator-aware `DEV_HOST` literal in `src/config.ts:19`.
 
+### The two widget pins (files, not repository variables)
+
+`buildConfig.ts` also carries `BUILD_WIDGET_VERSION` and
+`BUILD_WIDGET_INTEGRITY` (`src/generated/buildConfig.ts:42`, `:46`). These come
+from **files** at the repo root — `.widget-version` and `.widget-integrity`
+(`scripts/bake-build-config.sh:81-85`) — which addressiq-web's
+`widget-fanout.yml` commits on every web release, from **the same build**
+`cdn.yml` uploads, so the pinned hash cannot drift from the bytes on the CDN.
+
+They pin what the verify WebView loads:
+`{cdnUrl}/v{BUILD_WIDGET_VERSION}/iqcollect.js` with
+`integrity="{BUILD_WIDGET_INTEGRITY}"` (`src/ui/widgetHtml.ts:106`), enforced by
+WebKit/Chromium, with the vendored `WIDGET_JS` (`src/ui/widgetBundle.ts`) as the
+`onerror` fallback for a CDN outage, an offline device or an integrity failure.
+If either file is empty/absent both constants bake to `''`, the CDN path is
+disabled and the SDK is bundled-only. They are outside `--strict` — a release
+must not fail because no widget has been fanned out yet. Never hand-write a hash.
+
 > ⚠ **Behaviour change — a misconfigured release now fails.** The old release
 > step `sed`'d each key and printed *"unset — keeping checked-in default"*, so a
 > release with a missing variable published a package pointing at whatever was

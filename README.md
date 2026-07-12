@@ -196,12 +196,43 @@ via `resolveUrls()` (`src/config.ts:70-73`). `production` and `staging` are bake
 in at publish time from GitHub repository variables (see
 [`docs/RELEASE.md`](docs/RELEASE.md)); `development` is local-only and never baked.
 
-> **`cdnUrl` does not make the SDK load anything remotely.** The verify widget
-> ships **bundled** in the package (`WIDGET_JS` in `src/ui/widgetBundle.ts`), is
-> injected inline, and fails closed if it is missing — it never falls back to a
-> remote script. The CDN URL is a resolved config value only, exposed so hosts
-> (and any future asset loading) resolve the same per-environment host the web
-> SDK publishes to.
+### How the verify widget is loaded
+
+`cdnUrl` is not just config — the verify WebView loads the widget from it, under
+a Subresource-Integrity pin. Resolution order (`src/ui/widgetHtml.ts:74-111`):
+
+1. **`widgetUrl`** — explicit developer override, wins over everything.
+2. **Pinned CDN build** — `{cdnUrl}/v{BUILD_WIDGET_VERSION}/iqcollect.js` loaded
+   with `integrity="{BUILD_WIDGET_INTEGRITY}" crossorigin="anonymous"`
+   (`widgetHtml.ts:106`). WKWebView (WebKit) and Android WebView (Chromium) both
+   **enforce** `integrity`, so the CDN can only execute the exact bytes hashed at
+   build time. The pair is baked into `src/generated/buildConfig.ts` from the
+   repo-root `.widget-version` / `.widget-integrity` files, which addressiq-web's
+   release fanout writes from the same build the CDN serves; CDN paths are
+   immutable (`/v{x.y.z}/`, no floating alias) because a mutable URL cannot be
+   SRI-pinned.
+3. **Bundled widget** (`WIDGET_JS` in `src/ui/widgetBundle.ts`) — the *fallback*,
+   injected by `onerror="__iqWidgetFallback()"`, covering a CDN outage, an
+   offline device **and** an SRI mismatch. It is also the only source when the
+   CDN path is off (`development`, or an unbaked version/integrity —
+   `cdnWidgetEnabled`, `widgetHtml.ts:56-68`).
+
+With neither a pinned CDN build nor the bundle the SDK still **fails closed**
+(`WIDGET_BUNDLE_MISSING`, `widgetHtml.ts:110`) — it never loads an unpinned
+remote script.
+
+Three details in that markup are load-bearing — each fails *silently* toward
+"looks fine, but never actually uses the CDN":
+
+- `crossorigin="anonymous"` is **mandatory**: without it the cross-origin
+  response is opaque, `integrity` cannot be evaluated, and every load hard-fails
+  into the fallback.
+- **Script order**: a blocking classic `<script>` fires `onerror` before the
+  parser reaches the next inline script, so `__iqWidgetFallback()` is defined
+  *before* the remote tag (which carries no `defer`/`async`).
+- The inlined fallback bundle is **escaped** (`scriptSafe`, `widgetHtml.ts:70`)
+  — it contains `</script>`-alike sequences that would otherwise terminate the
+  tag.
 
 ## Errors
 
