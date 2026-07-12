@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.3.0...v0.4.0) (2026-07-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* removed googleMapsApiKey and mapboxToken from AddressIQConfig and the googleMapsApiKey prop from IQLocationManager. The key is provisioned automatically by the platform; there is nothing to pass.
+
+### Features
+
+* provision Google Maps key automatically; remove googleMapsApiKey/mapboxToken ([#4](https://github.com/PTLRepoHub/addressiq-react-native/issues/4)) ([6f4efef](https://github.com/PTLRepoHub/addressiq-react-native/commit/6f4efef96aa2b096b5eddbbb9128a986dbfcbb7c))
+
 ## [0.3.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.2.0...v0.3.0) (2026-07-10)
 
 
