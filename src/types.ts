@@ -27,10 +27,6 @@ export interface AddressIQConfig {
   ingestUrl?: string;
   /** Target environment. Defaults to 'production'. */
   environment?: AddressIQEnvironment;
-  /** Override Google Maps key (the SDK has its own production default). */
-  googleMapsApiKey?: string;
-  /** Optional Mapbox token used as geocoding fallback. */
-  mapboxToken?: string;
 }
 
 /** End-user identity bound to the current SDK session via `setUser()`. */
@@ -318,12 +314,6 @@ export interface IQLocationManagerProps {
   firstName?: string;
   lastName?: string;
   email?: string;
-  /**
-   * Google Maps API key for the address map flow (Places autocomplete, map pin,
-   * reverse geocoding, Street View). When omitted the address step degrades to
-   * GPS + manual entry. Falls back to `initialize({ googleMapsApiKey })`.
-   */
-  googleMapsApiKey?: string;
   theme?: Partial<AddressIQTheme>;
   initialAddress?: Partial<AddressData>;
   /**

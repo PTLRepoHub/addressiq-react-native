@@ -60,7 +60,6 @@ Keyed by environment (`production` / `staging` / `local`):
 ```jsonc
 "local": {
   "apiKey": "aiq_test_demo_bank_seed01",   // test key for the demo org
-  "googleMapsApiKey": "",                   // add a key to enable the address map
   "apiUrl": "http://10.0.2.2:4000",         // host as seen from the ANDROID emulator
   "businessName": "Kuda Business"           // fallback only — see below
 }
@@ -70,9 +69,11 @@ Keyed by environment (`production` / `staging` / `local`):
   (`10.0.2.2` = the emulator's alias for your machine's `localhost`). The app
   **auto-swaps it to `localhost` on iOS** (`VerificationScreen.tsx`), so one value
   works for both. On a **real device**, use your computer's LAN IP.
-- **`googleMapsApiKey`** — enables the address map (Places autocomplete + Street
-  View). Without a valid key the map step shows *"Oops! Something went wrong"* (see
-  Troubleshooting). The backend can also supply this via `/widget/config`.
+- **The address map key** (Places autocomplete + Street View) is **provisioned by
+  the platform** and fetched by the widget via `/widget/config` — you do **not**
+  set a Google Maps or Mapbox key in `credentials.json`. If the platform has no
+  valid map key configured, the map step shows *"Oops! Something went wrong"* (see
+  Troubleshooting).
 - **`businessName`** — a **fallback only**. Branding (name, logo, colours, button
   style, corner radius) normally comes from the backend via `/widget/config`,
   configured in the dashboard under **Settings → Branding → Widget**.
@@ -146,7 +147,7 @@ Then restart Metro with `--reset-cache` and reload.
 |---|---|
 | **"Network request failed"** on a verification | The app can't reach the backend. Android must use `10.0.2.2:4000` (not `localhost`); iOS uses `localhost:4000` (auto-swapped). Make sure the API is up on `:4000`. |
 | **Red screen / "Invalid hook call" / "more than one copy of React" / `useContext` of null** | Stale Metro/dev state after dependency or SDK changes. Restart the packager with `--reset-cache` and reload. |
-| **Map: "Oops! Something went wrong… Google Maps"** | Missing or invalid Google Maps key. Set a valid `googleMapsApiKey` in `credentials.json`, or configure the platform key on the backend (`/widget/config`). The key must have the **Maps JavaScript API** enabled. |
+| **Map: "Oops! Something went wrong… Google Maps"** | The platform has no valid map key configured. The key is provisioned by the platform and served to the widget via `/widget/config` — configure it on the backend (it must have the **Maps JavaScript API** enabled). Integrators do **not** set a key in `credentials.json`. |
 | **`No connected devices!` mid-build (Android)** | The emulator crashed/disconnected (often under memory pressure). Relaunch the AVD (`emulator -avd … -no-snapshot-load`), confirm `adb devices`, then re-run. |
 | **Widget branding doesn't reflect dashboard changes** | The widget fetches `/widget/config` **on each open** — close and reopen it. Also ensure you saved under **Settings → Branding → Widget** (persists to `settings.widget`). |
 | **iOS: focusing an input zooms the page** | Fixed — widget inputs are `font-size: 16px` and the native webview sets `maximum-scale=1`. If you see it again, you're on a stale bundle; rebuild the widget (§5) and reset Metro. |
