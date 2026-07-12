@@ -65,11 +65,15 @@ describe('buildHtml', () => {
     );
   });
 
-  it('is disabled by default: the widget pin is unbaked until a web release fans it out', () => {
-    // BUILD_WIDGET_VERSION / BUILD_WIDGET_INTEGRITY are '' until .widget-version
-    // and .widget-integrity land, so the SDK ships bundled-only today.
-    const { widgetVersion: _v, widgetIntegrity: _i, ...unpinned } = base;
-    expect(cdnWidgetEnabled(unpinned)).toBe(false);
+  it('is disabled when the widget pin is unbaked, enabled when it is present', () => {
+    // Assert on EXPLICIT empty pins, not on omitted fields. Omitting them falls
+    // back to BUILD_WIDGET_VERSION / BUILD_WIDGET_INTEGRITY, which are '' only
+    // until a web release fans out `.widget-version` / `.widget-integrity` — so
+    // the omitted-field version of this test passed for a transient reason and
+    // broke the moment the pins were actually baked.
+    expect(cdnWidgetEnabled({ ...base, widgetVersion: '', widgetIntegrity: '' })).toBe(false);
+    expect(cdnWidgetEnabled({ ...base, widgetVersion: '0.5.1', widgetIntegrity: '' })).toBe(false);
+    expect(cdnWidgetEnabled({ ...base, widgetVersion: '', widgetIntegrity: 'sha384-x' })).toBe(false);
     expect(cdnWidgetEnabled(base)).toBe(true);
   });
 });
