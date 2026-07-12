@@ -185,10 +185,12 @@ AddressIQ backend is running on `:3355`; otherwise use `staging`.
 
 `environment: 'production' | 'staging' | 'development'` fully determines the
 API + ingest base URLs — there is no URL override; integrators never pass a URL.
-The `production` API host is not a hard-coded literal: it is provisioned at
-publish time from the `ADDRESSIQ_API_URL` repo variable and baked into the
-shipped source (`src/generated/buildConfig.ts`), falling back to the public
-default `https://api.addressiqpro.com` when the variable is unset.
+The `production` API and ingest hosts are not hard-coded literals: they are
+provisioned at publish time from the `ADDRESSIQ_API_URL` and
+`ADDRESSIQ_INGEST_URL` repo variables and baked into the shipped source
+(`src/generated/buildConfig.ts`), falling back to the public defaults
+`https://api.addressiqpro.com` and `https://ingest-api.addressiqpro.com`
+respectively when the variables are unset.
 `development` targets a local backend on port `:3355` and is emulator-aware (the
 Android emulator uses `10.0.2.2` automatically, everything else uses `localhost`).
 The `apiKey` is supplied at `initialize()` — never hard-code production keys in

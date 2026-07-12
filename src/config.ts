@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import type { AddressIQConfig, AddressIQEnvironment, EnvironmentURLs } from './types';
 import { AddressIQError } from './errors';
-import { BUILD_API_URL } from './generated/buildConfig';
+import { BUILD_API_URL, BUILD_INGEST_URL } from './generated/buildConfig';
 
 /**
  * Compiled-in dev backend host. Emulator-aware: the Android emulator reaches
@@ -14,7 +14,7 @@ const DEV_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:3355' : 'http://lo
 const ENVIRONMENT_URLS: Record<AddressIQEnvironment, EnvironmentURLs> = {
   production: {
     apiUrl: BUILD_API_URL,
-    ingestUrl: 'https://ingest-api.addressiqpro.com',
+    ingestUrl: BUILD_INGEST_URL,
     privacyPolicyUrl: 'https://addressiqpro.com/privacy',
     termsUrl: 'https://addressiqpro.com/terms',
   },
