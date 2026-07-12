@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.8.0...v0.8.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* **test:** assert the CDN pin gate on explicit values, not omitted fields ([#18](https://github.com/PTLRepoHub/addressiq-react-native/issues/18)) ([1de5cc2](https://github.com/PTLRepoHub/addressiq-react-native/commit/1de5cc268352989965ecd21c78ac116c8e8a3740))
+
 ## [0.8.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.7.0...v0.8.0) (2026-07-12)
 
 
