@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.6.0...v0.7.0) (2026-07-12)
+
+
+### Features
+
+* **widget:** re-vendor iqcollect.js from web v0.4.2 ([#12](https://github.com/PTLRepoHub/addressiq-react-native/issues/12)) ([155ad13](https://github.com/PTLRepoHub/addressiq-react-native/commit/155ad1302cdd81b21a52671ef411079b56db9974))
+
 ## [0.6.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.5.0...v0.6.0) (2026-07-12)
 
 
