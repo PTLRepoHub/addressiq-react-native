@@ -78,7 +78,7 @@ import { IQLocationManager, startVerification } from '@addressiq/react-native';
 
 The platform provisions the map key automatically — the widget fetches it from
 the backend via `GET /api/v1/widget/config`, so integrators do **not** supply a
-Google Maps or Mapbox key. When a key is configured on the platform, the address
+Google Maps key. When a key is configured on the platform, the address
 step uses the map flow:
 
 - **Current location** or **Places Autocomplete** search to set the point,
@@ -150,7 +150,7 @@ cp src/config/credentials.template.json src/config/credentials.json
 #     - apiKey:           tenant key per environment (the `staging`/`local`
 #                         entries are pre-seeded with aiq_test_demo_bank_seed01)
 #   The map + Street View key is provisioned by the platform (fetched via
-#   `/widget/config`) — no integrator-supplied Maps/Mapbox key is required.
+#   `/widget/config`) — no integrator-supplied Google Maps key is required.
 #   credentials.json is gitignored; the template is the only tracked file.
 
 # 2. Install dependencies + native link
@@ -173,10 +173,9 @@ then `npm run android`. The Android SDK path is read from `$ANDROID_HOME` or
 the SDK. If the build can't find the SDK, create `examples/core/android/local.properties`
 with `sdk.dir=/Users/<you>/Library/Android/sdk`.
 
-Pick the environment (`staging` / `local` / `production`) on the **Login**
-screen — it selects the API + ingest hosts. Use `local` only when the
-[`geo-tagging`](https://github.com/PTLRepoHub) backend stack is running
-(`docker compose up -d && pnpm dev`, API on `:4000`); otherwise use `staging`.
+Pick the environment (`staging` / `development` / `production`) on the **Login**
+screen — it selects the API + ingest hosts. Use `development` only when a local
+AddressIQ backend is running on `:3355`; otherwise use `staging`.
 
 > **Expo example** (`examples/expo`) needs a **dev build**
 > (`npx expo prebuild && npx expo run:ios`), not Expo Go — the SDK ships
@@ -184,9 +183,14 @@ screen — it selects the API + ingest hosts. Use `local` only when the
 
 ## Environment
 
-`environment: 'production' | 'staging' | 'local'` selects the API + ingest
-base URLs (override with `apiUrl` / `ingestUrl`). The `apiKey` is supplied at
-`initialize()` — never hard-code production keys in the bundle.
+`environment: 'production' | 'staging' | 'development'` fully determines the
+API + ingest base URLs — there is no URL override; integrators never pass a URL.
+The environment enum selects the API + ingest hosts, so integrators just choose
+`production`, `staging`, or `development`.
+`development` targets a local backend on port `:3355` and is emulator-aware (the
+Android emulator uses `10.0.2.2` automatically, everything else uses `localhost`).
+The `apiKey` is supplied at `initialize()` — never hard-code production keys in
+the bundle.
 
 ## Errors
 

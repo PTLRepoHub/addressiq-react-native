@@ -15,8 +15,8 @@ your SDK changes show up here after a reinstall / Metro restart.
 ## 1. Prerequisites
 
 - **Node** 18+ and **npm**, **Watchman** (`brew install watchman`)
-- **A running AddressIQ backend** — the `geo-tagging` API on `http://localhost:4000`
-  (see §2). The widget/verification calls fail without it.
+- **A running AddressIQ backend** on `http://localhost:3355` (see §2). The
+  widget/verification calls fail without it.
 - **Android**: Android Studio + SDK, and an **AVD** (emulator). JDK 17.
 - **iOS** (macOS only): **Xcode** + command-line tools, and **CocoaPods**
   (`sudo gem install cocoapods`).
@@ -32,46 +32,40 @@ npm install
 
 ## 2. Start the backend
 
-The example talks to the AddressIQ API at `:4000`. Two ways to provide it:
-
-**A — the real API directly** (default in `credentials.json`, `apiUrl` → `:4000`):
-
-```bash
-cd geo-tagging && docker compose up -d      # brings up the API on :4000
-```
-
-**B — via the sample Node server** (`addressiq-node-backend`, listens on `:3355`):
+Selecting the `development` environment points the SDK at a local backend on
+`:3355`. Bring one up, e.g. the sample Node server:
 
 ```bash
 cd addressiq-node-backend
-node server.js                # proxies to the real API on :4000
+node server.js                # listens on :3355
 # …or fully offline with canned data:
 MOCK_UPSTREAM=1 node server.js
 ```
 
-If you use B, set `local.apiUrl` to the `:3355` host (see §3).
+The host is resolved automatically from the environment — there is **no**
+`apiUrl` to set. The Android emulator reaches the host via `10.0.2.2` and the
+iOS simulator via `localhost`; the SDK picks the right one for you.
 
 ---
 
 ## 3. Configure — `src/config/credentials.json`
 
-Keyed by environment (`production` / `staging` / `local`):
+Keyed by environment (`production` / `staging` / `development`):
 
 ```jsonc
-"local": {
+"development": {
   "apiKey": "aiq_test_demo_bank_seed01",   // test key for the demo org
-  "apiUrl": "http://10.0.2.2:4000",         // host as seen from the ANDROID emulator
   "businessName": "Kuda Business"           // fallback only — see below
 }
 ```
 
-- **`apiUrl`** — host of your backend. **The value is written in Android form**
-  (`10.0.2.2` = the emulator's alias for your machine's `localhost`). The app
-  **auto-swaps it to `localhost` on iOS** (`VerificationScreen.tsx`), so one value
-  works for both. On a **real device**, use your computer's LAN IP.
+- **The API host is NOT configured here** — pick `development` on the Login
+  screen and the SDK resolves the emulator-aware `:3355` loopback automatically
+  (`10.0.2.2` on the Android emulator, `localhost` on iOS). On a **real device**,
+  run the SDK against a reachable backend via the `staging`/`production` hosts.
 - **The address map key** (Places autocomplete + Street View) is **provisioned by
   the platform** and fetched by the widget via `/widget/config` — you do **not**
-  set a Google Maps or Mapbox key in `credentials.json`. If the platform has no
+  set a Google Maps key in `credentials.json`. If the platform has no
   valid map key configured, the map step shows *"Oops! Something went wrong"* (see
   Troubleshooting).
 - **`businessName`** — a **fallback only**. Branding (name, logo, colours, button
@@ -145,7 +139,7 @@ Then restart Metro with `--reset-cache` and reload.
 
 | Symptom | Cause / fix |
 |---|---|
-| **"Network request failed"** on a verification | The app can't reach the backend. Android must use `10.0.2.2:4000` (not `localhost`); iOS uses `localhost:4000` (auto-swapped). Make sure the API is up on `:4000`. |
+| **"Network request failed"** on a verification | The app can't reach the backend. In `development` the SDK targets `10.0.2.2:3355` on the Android emulator and `localhost:3355` on iOS (chosen automatically). Make sure a backend is up on `:3355`. |
 | **Red screen / "Invalid hook call" / "more than one copy of React" / `useContext` of null** | Stale Metro/dev state after dependency or SDK changes. Restart the packager with `--reset-cache` and reload. |
 | **Map: "Oops! Something went wrong… Google Maps"** | The platform has no valid map key configured. The key is provisioned by the platform and served to the widget via `/widget/config` — configure it on the backend (it must have the **Maps JavaScript API** enabled). Integrators do **not** set a key in `credentials.json`. |
 | **`No connected devices!` mid-build (Android)** | The emulator crashed/disconnected (often under memory pressure). Relaunch the AVD (`emulator -avd … -no-snapshot-load`), confirm `adb devices`, then re-run. |

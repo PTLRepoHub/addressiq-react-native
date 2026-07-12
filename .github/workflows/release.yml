@@ -26,6 +26,32 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
       - run: npm install
+      - name: Inject production API URL
+        # Bake the production API base URL into the shipped source from the
+        # repo variable ADDRESSIQ_API_URL. If the variable is unset, the safe
+        # default already checked into src/generated/buildConfig.ts is kept.
+        env:
+          ADDRESSIQ_API_URL: ${{ vars.ADDRESSIQ_API_URL }}
+        run: |
+          if [ -n "$ADDRESSIQ_API_URL" ]; then
+            node -e "const fs=require('fs');const f='src/generated/buildConfig.ts';const url=process.env.ADDRESSIQ_API_URL;const s=fs.readFileSync(f,'utf8').replace(/export const BUILD_API_URL = '[^']*';/, \"export const BUILD_API_URL = '\"+url+\"';\");fs.writeFileSync(f,s);"
+            echo "Injected ADDRESSIQ_API_URL into src/generated/buildConfig.ts"
+          else
+            echo "ADDRESSIQ_API_URL unset — keeping checked-in default"
+          fi
+      - name: Inject production ingest URL
+        # Bake the production ingest host into the shipped source from the
+        # repo variable ADDRESSIQ_INGEST_URL. If the variable is unset, the safe
+        # default already checked into src/generated/buildConfig.ts is kept.
+        env:
+          ADDRESSIQ_INGEST_URL: ${{ vars.ADDRESSIQ_INGEST_URL }}
+        run: |
+          if [ -n "$ADDRESSIQ_INGEST_URL" ]; then
+            node -e "const fs=require('fs');const f='src/generated/buildConfig.ts';const url=process.env.ADDRESSIQ_INGEST_URL;const s=fs.readFileSync(f,'utf8').replace(/export const BUILD_INGEST_URL = '[^']*';/, \"export const BUILD_INGEST_URL = '\"+url+\"';\");fs.writeFileSync(f,s);"
+            echo "Injected ADDRESSIQ_INGEST_URL into src/generated/buildConfig.ts"
+          else
+            echo "ADDRESSIQ_INGEST_URL unset — keeping checked-in default"
+          fi
       - run: npm run build
       - run: npm test
       - name: Set version from tag + publish

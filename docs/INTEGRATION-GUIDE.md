@@ -19,7 +19,7 @@ import {
 // 1. Bootstrap once at app start
 initialize({
   apiKey: 'aiq_test_...',
-  environment: 'staging', // 'production' | 'staging' | 'local'
+  environment: 'staging', // 'production' | 'staging' | 'development'
 });
 
 // 2. Bind the signed-in customer
@@ -241,7 +241,7 @@ Per [sdk-contract.md](https://github.com/addressiq/geo-tagging/blob/main/docs/sd
 | --- | --- | --- |
 | `OkHi.login({ auth, user, ... })` | `initialize(config)` + `setUser(user)` | Split bootstrap vs user binding |
 | `auth.branchId` + `auth.clientKey` | `apiKey` | Single tenant key per environment |
-| `auth.env` (`prod` / `sandbox` / `dev`) | `environment` (`production` / `staging` / `local`) | |
+| `auth.env` (`prod` / `sandbox` / `dev`) | `environment` (`production` / `staging` / `development`) | |
 | `startDigitalAddressVerification()` | `startVerification({ locationCode })` | Requires existing `locationCode` |
 | `startPhysicalAddressVerification()` | `startPhysicalVerification({ locationCode, provider })` | |
 | `startDigitalAndPhysicalAddressVerification()` | `startDigitalAndPhysicalVerification({ locationCode, physicalProvider })` | |

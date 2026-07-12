@@ -7,10 +7,10 @@ interface Props {
   onLogin: (session: SessionData) => void;
 }
 
-const ENVIRONMENTS: Environment[] = ['staging', 'local', 'production'];
+const ENVIRONMENTS: Environment[] = ['staging', 'development', 'production'];
 
 export default function LoginScreen({ onLogin }: Props) {
-  const [environment, setEnvironment] = useState<Environment>('local');
+  const [environment, setEnvironment] = useState<Environment>('development');
   const [appUserId, setAppUserId] = useState(__DEV__ ? 'cust_e2e_001' : '');
   const [firstName, setFirstName] = useState(__DEV__ ? 'Demo' : '');
   const [lastName, setLastName] = useState(__DEV__ ? 'User' : '');
