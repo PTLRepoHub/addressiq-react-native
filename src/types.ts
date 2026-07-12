@@ -13,6 +13,11 @@ export type AddressIQEnvironment = 'production' | 'staging' | 'development';
 export interface EnvironmentURLs {
   apiUrl: string;
   ingestUrl: string;
+  /**
+   * CDN base URL for the environment. Resolved config only — the SDK does not
+   * load the widget from here; the bundled asset is the only widget source.
+   */
+  cdnUrl: string;
   privacyPolicyUrl: string;
   termsUrl: string;
 }

@@ -153,7 +153,9 @@ Do **not** model AddressIQ web on `js-core/example`. IQCollect is collect-only; 
 - Flutter/iOS/Android parity PRs (separate repos — track as contract conformance work)
 - Contract E2E harness wiring to RN sample (geo-tagging `apps/e2e`)
 - P2 push registration, geofence heartbeat, OEM battery helpers
-- Renaming `staging` → `sandbox` in types (breaking change — needs contract + all SDKs)
+- ~~Renaming `staging` → `sandbox` in types~~ — settled the other way: `staging`
+  is the canonical name across all SDKs. RN already used it, so nothing changes
+  here (Flutter kept `sandbox` as a deprecated alias).
 
 ---
 

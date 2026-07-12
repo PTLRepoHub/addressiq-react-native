@@ -175,7 +175,7 @@ with `sdk.dir=/Users/<you>/Library/Android/sdk`.
 
 Pick the environment (`staging` / `development` / `production`) on the **Login**
 screen — it selects the API + ingest hosts. Use `development` only when a local
-AddressIQ backend is running on `:3355`; otherwise use `staging`.
+AddressIQ backend is running on `:4000`; otherwise use `staging`.
 
 > **Expo example** (`examples/expo`) needs a **dev build**
 > (`npx expo prebuild && npx expo run:ios`), not Expo Go — the SDK ships
@@ -184,13 +184,24 @@ AddressIQ backend is running on `:3355`; otherwise use `staging`.
 ## Environment
 
 `environment: 'production' | 'staging' | 'development'` fully determines the
-API + ingest base URLs — there is no URL override; integrators never pass a URL.
-The environment enum selects the API + ingest hosts, so integrators just choose
-`production`, `staging`, or `development`.
-`development` targets a local backend on port `:3355` and is emulator-aware (the
+base URLs — there is no URL override; integrators never pass a URL. `staging` is
+the canonical name across all AddressIQ SDKs.
+`development` targets a local backend on port `:4000` and is emulator-aware (the
 Android emulator uses `10.0.2.2` automatically, everything else uses `localhost`).
 The `apiKey` is supplied at `initialize()` — never hard-code production keys in
 the bundle.
+
+Each environment resolves three hosts — `apiUrl`, `ingestUrl`, and `cdnUrl` —
+via `resolveUrls()` (`src/config.ts:70-73`). `production` and `staging` are baked
+in at publish time from GitHub repository variables (see
+[`docs/RELEASE.md`](docs/RELEASE.md)); `development` is local-only and never baked.
+
+> **`cdnUrl` does not make the SDK load anything remotely.** The verify widget
+> ships **bundled** in the package (`WIDGET_JS` in `src/ui/widgetBundle.ts`), is
+> injected inline, and fails closed if it is missing — it never falls back to a
+> remote script. The CDN URL is a resolved config value only, exposed so hosts
+> (and any future asset loading) resolve the same per-environment host the web
+> SDK publishes to.
 
 ## Errors
 

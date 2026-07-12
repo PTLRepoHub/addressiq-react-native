@@ -56,6 +56,53 @@ There is **no `COCOAPODS_TRUNK_TOKEN`** in `release.yml`. If/when CocoaPods
 publishing is automated, that secret would be added (see
 `RELEASE-ENGINEERING.md:153-154`).
 
+## Build configuration (baked at publish time)
+
+`src/generated/buildConfig.ts` is **generated** — never hand-edit it.
+`scripts/bake-build-config.sh` rewrites it wholesale from six GitHub
+**repository variables** (`vars.*`, not secrets — their values are meant to ship
+in the package), three URLs for each shippable environment:
+
+| | staging | production |
+|---|---|---|
+| API | `STAGING_ADDRESSIQ_API_BASE_URL` | `PROD_ADDRESSIQ_API_BASE_URL` |
+| Ingest | `STAGING_ADDRESSIQ_INGEST_BASE_URL` | `PROD_ADDRESSIQ_INGEST_BASE_URL` |
+| CDN | `STAGING_ADDRESSIQ_CDN_BASE_URL` | `PROD_ADDRESSIQ_CDN_BASE_URL` |
+
+These replace the old single-environment `ADDRESSIQ_API_URL` /
+`ADDRESSIQ_INGEST_URL` pair: staging used to be a hardcoded literal and no CDN
+host was baked at all. The file is committed and shipped because RN distributes
+source — there is no later build step on the integrator's machine that could
+inject these.
+
+`development` is deliberately **not** baked — it points at the host machine's
+backend and stays the emulator-aware `DEV_HOST` literal in `src/config.ts:19`.
+
+> ⚠ **Behaviour change — a misconfigured release now fails.** The old release
+> step `sed`'d each key and printed *"unset — keeping checked-in default"*, so a
+> release with a missing variable published a package pointing at whatever was
+> committed, silently. `release.yml:28-37` now runs the baker with `--strict`,
+> which **hard-fails** the release if *any* of the six variables is unset
+> (`scripts/bake-build-config.sh:59-63`). **All six must be set as repository
+> variables before the next release.**
+
+Locally (and in CI outside release), running the script without `--strict` falls
+back to the checked-in safe public defaults
+(`scripts/bake-build-config.sh:31-38`), so `npm run build` and the test suite
+resolve real hosts with no substitution:
+
+```bash
+scripts/bake-build-config.sh            # local — unset vars keep their defaults
+scripts/bake-build-config.sh --strict   # what release.yml runs
+```
+
+Set the variables with:
+
+```bash
+gh variable set STAGING_ADDRESSIQ_API_BASE_URL --repo PTLRepoHub/addressiq-react-native --body https://…
+# …and the other five.
+```
+
 ## Versioning rules
 
 Config: `release-please-config.json` — `release-type: node`
@@ -90,6 +137,9 @@ commit messages — commits that aren't Conventional Commits produce no release.
       `react-native-webview@13.16.1` as a devDependency (`package.json:52`).
       Verify `npm run type-check` (`package.json:24`) passes before merging a
       release PR.
+- [ ] **All six build variables are set** (see *Build configuration* above).
+      The bake step runs with `--strict`, so a missing one fails the release:
+      `gh variable list --repo PTLRepoHub/addressiq-react-native`.
 - [ ] Confirm the release-please PR title is `chore: release X.Y.Z` and the
       version bump matches the merged commit types.
 

@@ -5,7 +5,7 @@ import type { IQLocationManagerProps } from '../types';
 import { resolveUrls, setConfig } from '../config';
 import { getNativeModule } from '../native/bridge';
 import { requestForegroundLocation } from '../index';
-import { WIDGET_JS } from './widgetBundle';
+import { buildHtml } from './widgetHtml';
 import { routeBridgeMessage } from './bridgeRouter';
 
 /**
@@ -22,22 +22,15 @@ import { routeBridgeMessage } from './bridgeRouter';
  *   native → JS: `window.AddressIQBridge.resolve(id, result)` / `.reject(id, err)`
  */
 /**
- * There is deliberately NO default remote widget URL.
- *
- * The widget ships bundled (see `widgetBundle.ts`, generated from
- * @addressiq/iqcollect-web). If that bundle is missing the package is broken,
- * and silently fetching a script from a CDN into this WebView — alongside the
- * session config — would turn a packaging bug into remote code execution.
- * We fail closed instead.
- *
- * `props.widgetUrl` remains supported as an explicit developer override for
- * serving a local bundle during development.
+ * The widget itself is loaded CDN-first with a Subresource-Integrity pin, with
+ * the bundled copy as the outage/offline fallback and a fail-closed path when
+ * neither is available — see `widgetHtml.ts` for the full rationale.
  */
 
 export default function IQLocationManager(props: IQLocationManagerProps) {
   const webRef = useRef<WebView>(null);
 
-  const apiUrl = useMemo(() => {
+  const urls = useMemo(() => {
     // setConfig REPLACES the global config; re-establish it from this widget's
     // props so the native SDK path (digital verification) and the widget resolve
     // the same environment-derived host.
@@ -45,9 +38,12 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
       apiKey: props.apiKey,
       environment: props.environment ?? 'production',
     });
-    return resolveUrls().apiUrl;
+    return resolveUrls();
   }, [props.apiKey, props.environment]);
+  const apiUrl = urls.apiUrl;
+  const cdnUrl = urls.cdnUrl;
   const widgetUrl = props.widgetUrl;
+  const environment = props.environment ?? 'production';
 
   const html = useMemo(
     () => buildHtml({
@@ -56,8 +52,10 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
       appUserId: props.appUserId,
       businessName: props.businessName,
       widgetUrl,
+      environment,
+      cdnUrl,
     }),
-    [props.apiKey, apiUrl, props.appUserId, props.businessName, widgetUrl],
+    [props.apiKey, apiUrl, cdnUrl, environment, props.appUserId, props.businessName, widgetUrl],
   );
 
   const reply = useCallback((id: string, result: unknown, error?: unknown) => {
@@ -150,52 +148,6 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
       </View>
     </Modal>
   );
-}
-
-function buildHtml(cfg: {
-  apiKey: string;
-  apiUrl: string;
-  appUserId: string;
-  businessName?: string;
-  widgetUrl?: string;
-}): string {
-  // Business identity is fetched by the widget from the backend (tenant behind
-  // the API key). Only forward a client-supplied fallback name if provided.
-  const config: Record<string, unknown> = {
-    apiKey: cfg.apiKey,
-    apiUrl: cfg.apiUrl,
-    appUserId: cfg.appUserId,
-    // Drives the platform-specific "Location permission" Settings screen.
-    platform: Platform.OS === 'ios' ? 'ios' : 'android',
-  };
-  if (cfg.businessName) config.business = { displayName: cfg.businessName };
-  // Prefer the bundled widget (offline, version-pinned). An explicit
-  // `widgetUrl` override is honoured for local development. With neither, fail
-  // closed rather than reaching for a CDN — see the note on DEFAULT_WIDGET_URL.
-  let widgetScript: string;
-  if (WIDGET_JS) {
-    widgetScript = `<script>${WIDGET_JS}</script>`;
-  } else if (cfg.widgetUrl) {
-    widgetScript = `<script src="${cfg.widgetUrl}"></script>`;
-  } else {
-    throw new Error(
-      '[AddressIQ] The bundled widget (widgetBundle.ts) is empty and no `widgetUrl` ' +
-      'override was supplied. This is a packaging bug — reinstall @addressiq/react-native. ' +
-      'The SDK will not load the widget from a remote host.',
-    );
-  }
-  return `<!doctype html><html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<style>html,body{margin:0;height:100%;background:#fff}#mount{min-height:100%}</style>
-</head><body>
-<div id="mount"></div>
-${widgetScript}
-<script>
-  var cfg = ${JSON.stringify(config)};
-  var c = new window.AddressIQ.IQCollect(document.getElementById('mount'), cfg);
-  c.open();
-</script>
-</body></html>`;
 }
 
 const styles = StyleSheet.create({ fill: { flex: 1 } });
