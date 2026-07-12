@@ -15,7 +15,7 @@ your SDK changes show up here after a reinstall / Metro restart.
 ## 1. Prerequisites
 
 - **Node** 18+ and **npm**, **Watchman** (`brew install watchman`)
-- **A running AddressIQ backend** on `http://localhost:3355` (see §2). The
+- **A running AddressIQ backend** on `http://localhost:4000` (see §2). The
   widget/verification calls fail without it.
 - **Android**: Android Studio + SDK, and an **AVD** (emulator). JDK 17.
 - **iOS** (macOS only): **Xcode** + command-line tools, and **CocoaPods**
@@ -33,11 +33,11 @@ npm install
 ## 2. Start the backend
 
 Selecting the `development` environment points the SDK at a local backend on
-`:3355`. Bring one up, e.g. the sample Node server:
+`:4000`. Bring one up, e.g. the sample Node server:
 
 ```bash
 cd addressiq-node-backend
-node server.js                # listens on :3355
+node server.js                # listens on :4000
 # …or fully offline with canned data:
 MOCK_UPSTREAM=1 node server.js
 ```
@@ -60,7 +60,7 @@ Keyed by environment (`production` / `staging` / `development`):
 ```
 
 - **The API host is NOT configured here** — pick `development` on the Login
-  screen and the SDK resolves the emulator-aware `:3355` loopback automatically
+  screen and the SDK resolves the emulator-aware `:4000` loopback automatically
   (`10.0.2.2` on the Android emulator, `localhost` on iOS). On a **real device**,
   run the SDK against a reachable backend via the `staging`/`production` hosts.
 - **The address map key** (Places autocomplete + Street View) is **provisioned by
@@ -139,7 +139,7 @@ Then restart Metro with `--reset-cache` and reload.
 
 | Symptom | Cause / fix |
 |---|---|
-| **"Network request failed"** on a verification | The app can't reach the backend. In `development` the SDK targets `10.0.2.2:3355` on the Android emulator and `localhost:3355` on iOS (chosen automatically). Make sure a backend is up on `:3355`. |
+| **"Network request failed"** on a verification | The app can't reach the backend. In `development` the SDK targets `10.0.2.2:4000` on the Android emulator and `localhost:4000` on iOS (chosen automatically). Make sure a backend is up on `:4000`. |
 | **Red screen / "Invalid hook call" / "more than one copy of React" / `useContext` of null** | Stale Metro/dev state after dependency or SDK changes. Restart the packager with `--reset-cache` and reload. |
 | **Map: "Oops! Something went wrong… Google Maps"** | The platform has no valid map key configured. The key is provisioned by the platform and served to the widget via `/widget/config` — configure it on the backend (it must have the **Maps JavaScript API** enabled). Integrators do **not** set a key in `credentials.json`. |
 | **`No connected devices!` mid-build (Android)** | The emulator crashed/disconnected (often under memory pressure). Relaunch the AVD (`emulator -avd … -no-snapshot-load`), confirm `adb devices`, then re-run. |

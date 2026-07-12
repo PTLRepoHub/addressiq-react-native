@@ -30,7 +30,7 @@ describe('api.startVerification (digital)', () => {
   it('POSTs to the nested digital verification path', async () => {
     await startVerification({ locationCode: 'loc_xyz789', idempotencyKey: 'iqidem_rn_abc' });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:3355/api/v1/locations/loc_xyz789/verifications/digital');
+    expect(url).toBe('http://localhost:4000/api/v1/locations/loc_xyz789/verifications/digital');
     expect(init.method).toBe('POST');
   });
 

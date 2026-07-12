@@ -456,7 +456,8 @@ Widget flows surface the same codes via `onError`.
 ### P3 — Docs hygiene (geo-tagging repo)
 
 - Retire stale `@addressiq/expo-react-native-sdk` doc page
-- Align `sandbox` vs `staging` environment naming in partner docs
+- Align environment naming in partner docs on **`staging`** (canonical across all
+  AddressIQ SDKs; `sandbox` above is OkHi's name for the same thing)
 
 ---
 

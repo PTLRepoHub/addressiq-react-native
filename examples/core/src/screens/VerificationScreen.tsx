@@ -80,7 +80,7 @@ export default function VerificationScreen({
   // The map key is provisioned by the platform via GET /api/v1/widget/config;
   // the example does not supply one.
   // The API host is derived entirely from `environment`. Use `development` for a
-  // local backend (SDK resolves the emulator-aware :3355 loopback automatically).
+  // local backend (SDK resolves the emulator-aware :4000 loopback automatically).
   // Fallback name only — the widget fetches the real business identity from the backend.
   const businessName = creds?.businessName;
 
@@ -99,7 +99,7 @@ export default function VerificationScreen({
     (async () => {
       try {
         // The host is resolved from `environment` alone — `development` maps to
-        // the emulator-aware :3355 loopback (10.0.2.2 on Android, localhost on iOS).
+        // the emulator-aware :4000 loopback (10.0.2.2 on Android, localhost on iOS).
         initialize({ apiKey, environment: session.environment });
         await setUser({
           appUserId: session.appUserId,
