@@ -45,11 +45,10 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
     setConfig({
       apiKey: props.apiKey,
       environment: props.environment ?? 'production',
-      googleMapsApiKey: props.googleMapsApiKey,
       apiUrl: props.apiUrlOverride,
     });
     return props.apiUrlOverride ?? resolveUrls().apiUrl;
-  }, [props.apiKey, props.environment, props.googleMapsApiKey, props.apiUrlOverride]);
+  }, [props.apiKey, props.environment, props.apiUrlOverride]);
   const widgetUrl = props.widgetUrl;
 
   const html = useMemo(

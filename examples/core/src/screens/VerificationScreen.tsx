@@ -34,7 +34,7 @@ import { loadAddresses, saveAddress, type SessionData } from '../storage';
 
 type Creds = Record<
   string,
-  { apiKey: string; googleMapsApiKey?: string; apiUrl?: string; businessName?: string }
+  { apiKey: string; apiUrl?: string; businessName?: string }
 >;
 
 function loadCredentials(): Creds {
@@ -78,10 +78,8 @@ export default function VerificationScreen({
 
   const creds = loadCredentials()[session.environment];
   const apiKey = creds?.apiKey ?? '';
-  // Set this in credentials.json to enable the full map flow (Places
-  // autocomplete + Street View). Without it the address step shows the Apple
-  // Maps pin + manual entry.
-  const googleMapsApiKey = creds?.googleMapsApiKey;
+  // The map key is provisioned by the platform via GET /api/v1/widget/config;
+  // the example does not supply one.
   // Point at a local backend for development. The Android emulator reaches the
   // host via 10.0.2.2; the iOS simulator reaches it via localhost. credentials.json
   // stores the Android form, so swap the host on iOS.
@@ -308,7 +306,6 @@ export default function VerificationScreen({
       <IQLocationManager
         visible={widgetOpen}
         apiKey={apiKey}
-        googleMapsApiKey={googleMapsApiKey}
         apiUrlOverride={apiUrl}
         businessName={businessName}
         environment={session.environment}
