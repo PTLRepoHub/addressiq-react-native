@@ -240,8 +240,9 @@ Per [sdk-contract.md](https://github.com/addressiq/geo-tagging/blob/main/docs/sd
 | OkHi API | AddressIQ equivalent | Notes |
 | --- | --- | --- |
 | `OkHi.login({ auth, user, ... })` | `initialize(config)` + `setUser(user)` | Split bootstrap vs user binding |
-| `auth.branchId` + `auth.clientKey` | `apiKey` | Single tenant key per environment |
-| `auth.env` (`prod` / `sandbox` / `dev`) | `environment` (`production` / `staging` / `development`) | |
+| `auth.branchId` + `auth.clientKey` | `apiKey` | Single tenant key. The key also carries sandbox-vs-production mode (`aiq_test_…` / `aiq_live_…`) |
+| `auth.env: 'sandbox'` / `'prod'` | **the API key you paste** — *not* a config field | OkHi's `env` is a **tenant mode**. In AddressIQ that is a property of the key, resolved server-side: paste `aiq_test_…` for sandbox, `aiq_live_…` for production. There is no SDK field for it. |
+| *(no OkHi equivalent)* | `deployment` (`production` / `staging` / `development`) | Which AddressIQ **hosts** to talk to — a different axis. `'sandbox'` is **not** a valid value. |
 | `startDigitalAddressVerification()` | `startVerification({ locationCode })` | Requires existing `locationCode` |
 | `startPhysicalAddressVerification()` | `startPhysicalVerification({ locationCode, provider })` | |
 | `startDigitalAndPhysicalAddressVerification()` | `startDigitalAndPhysicalVerification({ locationCode, physicalProvider })` | |
@@ -456,8 +457,12 @@ Widget flows surface the same codes via `onError`.
 ### P3 — Docs hygiene (geo-tagging repo)
 
 - Retire stale `@addressiq/expo-react-native-sdk` doc page
-- Align environment naming in partner docs on **`staging`** (canonical across all
-  AddressIQ SDKs; `sandbox` above is OkHi's name for the same thing)
+- Align deployment naming in partner docs on **`staging`** (canonical across all
+  AddressIQ SDKs). Note `sandbox` is **not** OkHi's name for `staging` — OkHi's
+  `sandbox` is a tenant mode, which in AddressIQ is carried by the API key
+  (`aiq_test_…`), not by the `deployment` field. Migrators who map it onto
+  `staging` will point at pre-production *hosts* while still using whichever
+  tenant mode their key implies.
 
 ---
 

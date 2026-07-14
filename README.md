@@ -36,7 +36,7 @@ React Native ≥ 0.72 (TurboModule codegen). Runs in Expo via a dev build (not E
 ```ts
 import { initialize, setUser, startVerification } from '@addressiq/react-native';
 
-await initialize({ apiKey: 'aiq_live_…', environment: 'production' });
+await initialize({ apiKey: 'aiq_live_…', deployment: 'production' });
 await setUser({ appUserId: 'cust_123' });
 
 // Verify an address you already collected (see Collect UI below):
@@ -183,7 +183,7 @@ AddressIQ backend is running on `:4000`; otherwise use `staging`.
 
 ## Environment
 
-`environment: 'production' | 'staging' | 'development'` fully determines the
+`deployment: 'production' | 'staging' | 'development'` fully determines the
 base URLs — there is no URL override; integrators never pass a URL. `staging` is
 the canonical name across all AddressIQ SDKs.
 `development` targets a local backend on port `:4000` and is emulator-aware (the

@@ -153,9 +153,12 @@ Do **not** model AddressIQ web on `js-core/example`. IQCollect is collect-only; 
 - Flutter/iOS/Android parity PRs (separate repos — track as contract conformance work)
 - Contract E2E harness wiring to RN sample (geo-tagging `apps/e2e`)
 - P2 push registration, geofence heartbeat, OEM battery helpers
-- ~~Renaming `staging` → `sandbox` in types~~ — settled the other way: `staging`
-  is the canonical name across all SDKs. RN already used it, so nothing changes
-  here (Flutter kept `sandbox` as a deprecated alias).
+- ~~Renaming `staging` → `sandbox` in types~~ — settled, and then settled harder:
+  the two are not the same axis. `staging` is a **deployment** (which hosts);
+  `sandbox` is a **tenant mode** carried by the API key and resolved server-side.
+  The field is now named `deployment` across all SDKs, and `'sandbox'` is
+  rejected as a value rather than aliased to `staging` (which is what Flutter,
+  iOS, Android and web used to do).
 
 ---
 

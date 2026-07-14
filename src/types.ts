@@ -6,15 +6,27 @@
  * rewriting their integration layer.
  */
 
-/** Target environment for the SDK. */
-export type AddressIQEnvironment = 'production' | 'staging' | 'development';
+/**
+ * Which AddressIQ DEPLOYMENT the SDK talks to — i.e. which hosts.
+ *
+ * This is NOT the tenant's mode. Sandbox-vs-production is a property of the API
+ * KEY (`aiq_test_…` resolves to a sandbox tenant server-side, `aiq_live_…` to a
+ * production one) and is decided entirely by the backend on every request — the
+ * SDK neither sends it nor can influence it. The axes are orthogonal: a test key
+ * against the production deployment is still sandbox.
+ *
+ * Note `'sandbox'` is NOT a value here. Other AddressIQ SDKs used to accept it as
+ * an alias for `'staging'`, which asserted that sandbox was a deployment. It is
+ * not, and it is rejected everywhere.
+ */
+export type AddressIQDeployment = 'production' | 'staging' | 'development';
 
-/** Resolved per-environment URLs the SDK talks to. */
-export interface EnvironmentURLs {
+/** Resolved per-deployment URLs the SDK talks to. */
+export interface DeploymentURLs {
   apiUrl: string;
   ingestUrl: string;
   /**
-   * CDN base URL for the environment. Resolved config only — the SDK does not
+   * CDN base URL for the deployment. Resolved config only — the SDK does not
    * load the widget from here; the bundled asset is the only widget source.
    */
   cdnUrl: string;
@@ -24,10 +36,18 @@ export interface EnvironmentURLs {
 
 /** Top-level SDK config — passed once to `initialize()`. */
 export interface AddressIQConfig {
-  /** Tenant API key (issued from the AddressIQ dashboard). */
+  /**
+   * Tenant API key (issued from the AddressIQ dashboard). This — not
+   * `deployment` — decides whether the tenant is in sandbox or production mode:
+   * `aiq_test_…` resolves to a sandbox App row server-side, `aiq_live_…` to a
+   * production one.
+   */
   apiKey: string;
-  /** Target environment. Defaults to 'production'. */
-  environment?: AddressIQEnvironment;
+  /**
+   * Which DEPLOYMENT (i.e. which hosts) to target. Defaults to 'production'.
+   * An unrecognised value throws.
+   */
+  deployment?: AddressIQDeployment;
 }
 
 /** End-user identity bound to the current SDK session via `setUser()`. */
@@ -303,7 +323,7 @@ export interface AddressIQTheme {
  */
 export interface IQLocationManagerProps {
   apiKey: string;
-  environment?: AddressIQEnvironment;
+  deployment?: AddressIQDeployment;
   /**
    * Your stable identifier for the end-user (e.g. `cust_01J9P7XK`).
    * The AddressIQ backend uses this as the canonical user key for

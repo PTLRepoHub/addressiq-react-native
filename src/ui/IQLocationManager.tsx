@@ -33,17 +33,17 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
   const urls = useMemo(() => {
     // setConfig REPLACES the global config; re-establish it from this widget's
     // props so the native SDK path (digital verification) and the widget resolve
-    // the same environment-derived host.
+    // the same deployment-derived host.
     setConfig({
       apiKey: props.apiKey,
-      environment: props.environment ?? 'production',
+      deployment: props.deployment ?? 'production',
     });
     return resolveUrls();
-  }, [props.apiKey, props.environment]);
+  }, [props.apiKey, props.deployment]);
   const apiUrl = urls.apiUrl;
   const cdnUrl = urls.cdnUrl;
   const widgetUrl = props.widgetUrl;
-  const environment = props.environment ?? 'production';
+  const deployment = props.deployment ?? 'production';
 
   const html = useMemo(
     () => buildHtml({
@@ -52,10 +52,10 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
       appUserId: props.appUserId,
       businessName: props.businessName,
       widgetUrl,
-      environment,
+      deployment,
       cdnUrl,
     }),
-    [props.apiKey, apiUrl, cdnUrl, environment, props.appUserId, props.businessName, widgetUrl],
+    [props.apiKey, apiUrl, cdnUrl, deployment, props.appUserId, props.businessName, widgetUrl],
   );
 
   const reply = useCallback((id: string, result: unknown, error?: unknown) => {
