@@ -364,7 +364,6 @@ initialize({
   deployment: "development",
   devApiUrl: Config.ADDRESSIQ_DEV_API_URL,
   devIngestUrl: Config.ADDRESSIQ_DEV_INGEST_URL,
-  devCdnUrl: Config.ADDRESSIQ_DEV_CDN_URL,
 });
 ```
 

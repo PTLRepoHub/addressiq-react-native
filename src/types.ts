@@ -63,8 +63,6 @@ export interface AddressIQConfig {
   devApiUrl?: string;
   /** Development-only ingest host. Falls back to `ADDRESSIQ_DEV_INGEST_URL`. */
   devIngestUrl?: string;
-  /** Development-only CDN host. Falls back to `ADDRESSIQ_DEV_CDN_URL`. */
-  devCdnUrl?: string;
 }
 
 /** End-user identity bound to the current SDK session via `setUser()`. */

@@ -31,7 +31,6 @@ describe('dev host overrides', () => {
     expect(urls.apiUrl).toBe(LAN);
     expect(urls.ingestUrl).not.toBe(LAN);
     expect(urls.ingestUrl).toContain(':4000');
-    expect(urls.cdnUrl).not.toBe(LAN);
   });
 
   it('is a no-op when nothing is set', () => {

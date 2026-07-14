@@ -145,13 +145,11 @@ export function resolveUrls(): DeploymentURLs {
   // set on a shipped deployment.
   const apiUrl = devOverride(deployment, 'ADDRESSIQ_DEV_API_URL', cfg.devApiUrl);
   const ingestUrl = devOverride(deployment, 'ADDRESSIQ_DEV_INGEST_URL', cfg.devIngestUrl);
-  const cdnUrl = devOverride(deployment, 'ADDRESSIQ_DEV_CDN_URL', cfg.devCdnUrl);
-  if (!apiUrl && !ingestUrl && !cdnUrl) return urls;
+  if (!apiUrl && !ingestUrl) return urls;
   return {
     ...urls,
     apiUrl: apiUrl ?? urls.apiUrl,
     ingestUrl: ingestUrl ?? urls.ingestUrl,
-    cdnUrl: cdnUrl ?? urls.cdnUrl,
   };
 }
 
