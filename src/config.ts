@@ -19,6 +19,52 @@ import {
 const DEV_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 
 /**
+ * A development-only override, or undefined.
+ *
+ * Two sources, in order:
+ *
+ *   1. the `dev*` fields on `AddressIQConfig` — the reliable path. React Native
+ *      ships SOURCE and has no build step of its own, so the SDK cannot count on
+ *      `process.env` being inlined; the HOST APP supplies the values from its own
+ *      env (react-native-config, a dotenv babel plugin, Expo, whatever it uses).
+ *   2. `process.env.ADDRESSIQ_DEV_*` — works when the app's bundler does inline it
+ *      (Expo, or babel-plugin-transform-inline-environment-variables). Guarded,
+ *      because in a bare RN app `process.env.X` is simply undefined.
+ *
+ * They exist because the `development` hosts are otherwise the DEV_HOST literal,
+ * and `10.0.2.2` is an Android-EMULATOR alias that a physical device cannot reach.
+ *
+ * Honoured ONLY in `development`. Supplied on any other deployment it throws — a
+ * build-time value must never be able to point a shipped app at an arbitrary host,
+ * and a security-relevant setting that silently does nothing is worse than a loud
+ * failure.
+ */
+export function devOverride(
+  deployment: AddressIQDeployment,
+  name: string,
+  fromConfig?: string,
+): string | undefined {
+  // Reached via globalThis rather than the `process` global: this package has no
+  // @types/node (it targets React Native, not Node), and in a bare RN app
+  // `process.env.X` is undefined anyway — so it must not be a hard reference.
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+    ?.env;
+  const fromEnv = env?.[name];
+  const value = fromConfig || fromEnv;
+  if (!value) return undefined;
+  if (deployment !== 'development') {
+    throw new AddressIQError(
+      'INVALID_CONFIG',
+      `AddressIQ: ${name} is a development-only override, but deployment is ` +
+        `"${deployment}". Outside development the SDK resolves its hosts from the values ` +
+        `baked at release — it will not let a build-time value point a shipped app at an ` +
+        `arbitrary host. Unset ${name}, or set deployment: 'development'.`,
+    );
+  }
+  return value;
+}
+
+/**
  * Per-deployment URLs. `production` and `staging` are baked in at publish time
  * from the `PROD_*` / `STAGING_*` GitHub variables (see
  * scripts/bake-build-config.sh); `development` is deliberately NOT baked — it
@@ -93,8 +139,22 @@ export function resolveUrls(): DeploymentURLs {
         `${Object.keys(DEPLOYMENT_URLS).join(', ')}.${hint}`,
     );
   }
-  return urls;
+
+  // Development-only overrides. Each is independent — supplying the API host must
+  // not drag the ingest or CDN host along with it. devOverride throws if any is
+  // set on a shipped deployment.
+  const apiUrl = devOverride(deployment, 'ADDRESSIQ_DEV_API_URL', cfg.devApiUrl);
+  const ingestUrl = devOverride(deployment, 'ADDRESSIQ_DEV_INGEST_URL', cfg.devIngestUrl);
+  const cdnUrl = devOverride(deployment, 'ADDRESSIQ_DEV_CDN_URL', cfg.devCdnUrl);
+  if (!apiUrl && !ingestUrl && !cdnUrl) return urls;
+  return {
+    ...urls,
+    apiUrl: apiUrl ?? urls.apiUrl,
+    ingestUrl: ingestUrl ?? urls.ingestUrl,
+    cdnUrl: cdnUrl ?? urls.cdnUrl,
+  };
 }
+
 
 export function resetConfig(): void {
   _config = null;

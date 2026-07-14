@@ -48,6 +48,23 @@ export interface AddressIQConfig {
    * An unrecognised value throws.
    */
   deployment?: AddressIQDeployment;
+
+  // ── Development-only overrides ──────────────────────────────────────────────
+  // All of these throw unless `deployment` is 'development'. React Native ships
+  // source and has no build step of its own, so the SDK cannot rely on
+  // `process.env` being inlined — the HOST APP passes these in from its own env
+  // (react-native-config, a dotenv babel plugin, Expo, …). See .env.example.
+  //
+  // They exist because the `development` hosts are otherwise a compiled-in
+  // literal, and `10.0.2.2` is an Android-EMULATOR alias a physical device
+  // cannot reach.
+
+  /** Development-only API host, e.g. a LAN IP. Falls back to `ADDRESSIQ_DEV_API_URL`. */
+  devApiUrl?: string;
+  /** Development-only ingest host. Falls back to `ADDRESSIQ_DEV_INGEST_URL`. */
+  devIngestUrl?: string;
+  /** Development-only CDN host. Falls back to `ADDRESSIQ_DEV_CDN_URL`. */
+  devCdnUrl?: string;
 }
 
 /** End-user identity bound to the current SDK session via `setUser()`. */
