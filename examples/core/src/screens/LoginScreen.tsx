@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, SafeAreaView } from 'react-native';
 import Button from '../components/Button';
-import type { Environment, SessionData } from '../storage';
+import type { Deployment, SessionData } from '../storage';
 
 interface Props {
   onLogin: (session: SessionData) => void;
 }
 
-const ENVIRONMENTS: Environment[] = ['staging', 'development', 'production'];
+const DEPLOYMENTS: Deployment[] = ['staging', 'development', 'production'];
 
 export default function LoginScreen({ onLogin }: Props) {
-  const [environment, setEnvironment] = useState<Environment>('development');
+  const [deployment, setDeployment] = useState<Deployment>('development');
   const [appUserId, setAppUserId] = useState(__DEV__ ? 'cust_e2e_001' : '');
   const [firstName, setFirstName] = useState(__DEV__ ? 'Demo' : '');
   const [lastName, setLastName] = useState(__DEV__ ? 'User' : '');
@@ -24,14 +24,14 @@ export default function LoginScreen({ onLogin }: Props) {
       <Text style={styles.title}>AddressIQ</Text>
       <Text style={styles.subtitle}>Sign in to try address collection and verification — same flow as the OkHi example login screen.</Text>
 
-      <Text style={styles.label}>Environment</Text>
+      <Text style={styles.label}>Deployment</Text>
       <View style={styles.envRow}>
-        {ENVIRONMENTS.map((env) => (
+        {DEPLOYMENTS.map((env) => (
           <Button
             key={env}
             label={env}
-            variant={environment === env ? 'primary' : 'secondary'}
-            onPress={() => setEnvironment(env)}
+            variant={deployment === env ? 'primary' : 'secondary'}
+            onPress={() => setDeployment(env)}
           />
         ))}
       </View>
@@ -45,7 +45,7 @@ export default function LoginScreen({ onLogin }: Props) {
       <Button
         label="Continue to SDK Hub"
         onPress={() =>
-          onLogin({ environment, appUserId, firstName, lastName, email, phone })
+          onLogin({ deployment, appUserId, firstName, lastName, email, phone })
         }
         disabled={!valid}
       />

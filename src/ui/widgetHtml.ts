@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { AddressIQEnvironment } from '../types';
+import type { AddressIQDeployment } from '../types';
 import { BUILD_WIDGET_INTEGRITY, BUILD_WIDGET_VERSION } from '../generated/buildConfig';
 import { WIDGET_JS } from './widgetBundle';
 
@@ -42,8 +42,8 @@ export interface WidgetHtmlConfig {
   businessName?: string;
   /** Explicit developer override; wins over the CDN and the bundle. */
   widgetUrl?: string;
-  environment?: AddressIQEnvironment;
-  /** Per-environment CDN base, from `resolveUrls().cdnUrl`. */
+  deployment?: AddressIQDeployment;
+  /** Per-deployment CDN base, from `resolveUrls().cdnUrl`. */
   cdnUrl?: string;
   /** Default to the baked constants; parameters only so tests can vary them. */
   widgetVersion?: string;
@@ -59,7 +59,7 @@ export function cdnWidgetEnabled(cfg: WidgetHtmlConfig): boolean {
   // `development`'s "CDN" is the local dev host, which publishes no versioned,
   // integrity-matching bundle.
   return (
-    (cfg.environment ?? 'production') !== 'development' &&
+    (cfg.deployment ?? 'production') !== 'development' &&
     !!cfg.cdnUrl &&
     !!version &&
     !!integrity

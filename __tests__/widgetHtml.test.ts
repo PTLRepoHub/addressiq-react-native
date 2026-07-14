@@ -10,7 +10,7 @@ const base: WidgetHtmlConfig = {
   apiKey: 'aiq_test',
   apiUrl: 'https://api.addressiqpro.com',
   appUserId: 'cust_1',
-  environment: 'production',
+  deployment: 'production',
   cdnUrl: 'https://cdn.addressiqpro.com',
   widgetVersion: '0.4.0',
   widgetIntegrity: 'sha384-TESTHASH',
@@ -37,7 +37,7 @@ describe('buildHtml', () => {
   });
 
   it('inlines the bundle and loads no remote script in development', () => {
-    const html = buildHtml({ ...base, environment: 'development', cdnUrl: 'http://localhost:4000' });
+    const html = buildHtml({ ...base, deployment: 'development', cdnUrl: 'http://localhost:4000' });
     expect(html).toContain(`<script>${BUNDLE}</script>`);
     expect(html).not.toContain('<script src=');
     expect(html).not.toContain('integrity=');

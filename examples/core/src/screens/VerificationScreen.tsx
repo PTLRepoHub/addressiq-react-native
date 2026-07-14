@@ -75,11 +75,11 @@ export default function VerificationScreen({
   const [modal, setModal] = useState<{ title: string; payload: unknown; type?: string } | null>(null);
   const activeVerification = useRef<string | null>(null);
 
-  const creds = loadCredentials()[session.environment];
+  const creds = loadCredentials()[session.deployment];
   const apiKey = creds?.apiKey ?? '';
   // The map key is provisioned by the platform via GET /api/v1/widget/config;
   // the example does not supply one.
-  // The API host is derived entirely from `environment`. Use `development` for a
+  // The API host is derived entirely from `deployment`. Use `development` for a
   // local backend (SDK resolves the emulator-aware :4000 loopback automatically).
   // Fallback name only — the widget fetches the real business identity from the backend.
   const businessName = creds?.businessName;
@@ -98,9 +98,9 @@ export default function VerificationScreen({
     let cancelled = false;
     (async () => {
       try {
-        // The host is resolved from `environment` alone — `development` maps to
+        // The host is resolved from `deployment` alone — `development` maps to
         // the emulator-aware :4000 loopback (10.0.2.2 on Android, localhost on iOS).
-        initialize({ apiKey, environment: session.environment });
+        initialize({ apiKey, deployment: session.deployment });
         await setUser({
           appUserId: session.appUserId,
           firstName: session.firstName,
@@ -206,7 +206,7 @@ export default function VerificationScreen({
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hi, {session.firstName || 'there'}</Text>
-          <Text style={styles.env}>{session.environment}</Text>
+          <Text style={styles.env}>{session.deployment}</Text>
         </View>
         <Pressable style={styles.gear} onPress={() => setSettingsOpen(true)}>
           <Text style={styles.gearIcon}>⚙</Text>
@@ -301,7 +301,7 @@ export default function VerificationScreen({
         visible={widgetOpen}
         apiKey={apiKey}
         businessName={businessName}
-        environment={session.environment}
+        deployment={session.deployment}
         appUserId={session.appUserId}
         firstName={session.firstName}
         lastName={session.lastName}
