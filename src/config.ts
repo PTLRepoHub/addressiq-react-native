@@ -72,10 +72,9 @@ export function devOverride(
  *
  * The verify WebView loads the widget from `cdnUrl`, CDN-first: the immutable,
  * version-addressed `{cdnUrl}/v{x.y.z}/iqcollect.js` with a Subresource-Integrity
- * pin (BUILD_WIDGET_INTEGRITY), falling back to the bundled WIDGET_JS on a CDN
- * outage, offline device, or SRI mismatch — see src/ui/widgetHtml.ts.
- * `development` resolves to the local host and is excluded from the CDN path; it
- * inlines the bundle.
+ * pin (BUILD_WIDGET_INTEGRITY) — the ONLY source, since the SDK ships no bundled
+ * copy. A failed load surfaces WIDGET_LOAD_FAILED (see src/ui/widgetHtml.ts).
+ * `development` is not excluded: it loads the same pinned widget from the prod CDN.
  */
 const DEPLOYMENT_URLS: Record<AddressIQDeployment, DeploymentURLs> = {
   production: {
@@ -95,7 +94,10 @@ const DEPLOYMENT_URLS: Record<AddressIQDeployment, DeploymentURLs> = {
   development: {
     apiUrl: DEV_HOST,
     ingestUrl: DEV_HOST,
-    cdnUrl: DEV_HOST,
+    // NOT the dev host: the local backend serves no /v{x.y.z}/iqcollect.js, and the
+    // SDK ships no bundled copy. A dev build loads the real pinned widget from the
+    // production CDN; override with devCdnUrl / ADDRESSIQ_DEV_CDN_URL.
+    cdnUrl: BUILD_PROD_CDN_URL,
     privacyPolicyUrl: 'http://localhost:3000/privacy',
     termsUrl: 'http://localhost:3000/terms',
   },
@@ -145,11 +147,13 @@ export function resolveUrls(): DeploymentURLs {
   // set on a shipped deployment.
   const apiUrl = devOverride(deployment, 'ADDRESSIQ_DEV_API_URL', cfg.devApiUrl);
   const ingestUrl = devOverride(deployment, 'ADDRESSIQ_DEV_INGEST_URL', cfg.devIngestUrl);
-  if (!apiUrl && !ingestUrl) return urls;
+  const cdnUrl = devOverride(deployment, 'ADDRESSIQ_DEV_CDN_URL', cfg.devCdnUrl);
+  if (!apiUrl && !ingestUrl && !cdnUrl) return urls;
   return {
     ...urls,
     apiUrl: apiUrl ?? urls.apiUrl,
     ingestUrl: ingestUrl ?? urls.ingestUrl,
+    cdnUrl: cdnUrl ?? urls.cdnUrl,
   };
 }
 

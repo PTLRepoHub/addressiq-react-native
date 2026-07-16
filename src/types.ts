@@ -63,6 +63,12 @@ export interface AddressIQConfig {
   devApiUrl?: string;
   /** Development-only ingest host. Falls back to `ADDRESSIQ_DEV_INGEST_URL`. */
   devIngestUrl?: string;
+  /**
+   * Development-only CDN host the widget loads from. Falls back to
+   * `ADDRESSIQ_DEV_CDN_URL`. Only needed if you serve a published widget build
+   * yourself — a dev build otherwise loads the pinned widget from the prod CDN.
+   */
+  devCdnUrl?: string;
 }
 
 /** End-user identity bound to the current SDK session via `setUser()`. */

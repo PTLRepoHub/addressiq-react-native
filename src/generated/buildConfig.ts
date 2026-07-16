@@ -39,8 +39,9 @@ export const BUILD_PROD_CDN_URL = 'https://cdn.addressiqpro.com';
 
 /** Widget version published to the CDN, WITHOUT the leading `v` (e.g. `0.4.0`).
  *  Baked from the `.widget-version` file; `''` when absent. */
-export const BUILD_WIDGET_VERSION = '';
+export const BUILD_WIDGET_VERSION = '0.5.3';
 
 /** Subresource-Integrity hash of `{cdn}/v{version}/iqcollect.js` (e.g. `sha384-…`).
  *  Baked from the `.widget-integrity` file; `''` when absent. */
-export const BUILD_WIDGET_INTEGRITY = '';
+export const BUILD_WIDGET_INTEGRITY =
+  'sha384-wUErWmll1WWgesjXvSN93KLxHTDLNXdZ4FMR9nT2tQ7tpdBdEuQCDMkHgdssRvkb';

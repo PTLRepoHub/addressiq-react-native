@@ -1,46 +1,49 @@
 import { Platform } from 'react-native';
 import type { AddressIQDeployment } from '../types';
 import { BUILD_WIDGET_INTEGRITY, BUILD_WIDGET_VERSION } from '../generated/buildConfig';
-import { WIDGET_JS } from './widgetBundle';
 
 /**
- * How the verify WebView obtains the widget JS: CDN-first, integrity-pinned,
- * with the bundled copy as the fallback.
+ * How the verify WebView obtains the widget JS.
+ *
+ * The SRI-pinned CDN copy is the ONLY source. The SDK no longer vendors a bundled
+ * widget:
  *
  *  - The widget is published to `{cdnUrl}/v{x.y.z}/iqcollect.js` — an IMMUTABLE,
  *    version-addressed path. That immutability is what makes a Subresource-
- *    Integrity pin meaningful: `BUILD_WIDGET_INTEGRITY` describes the exact
- *    bytes at that exact path, so the CDN cannot swap them under us. Both
- *    WKWebView (WebKit) and Android WebView (Chromium) enforce SRI, so a
- *    tampered bundle refuses to execute and fires `onerror` — this is not a
- *    blind "fetch and run whatever the host returns".
- *  - The bundled widget (`WIDGET_JS`) is STILL embedded in the page as the
- *    fallback: `__iqWidgetFallback()` is defined before the remote <script> and
- *    injects it inline if the remote one fails. That covers a CDN outage, an
- *    offline device, and an SRI mismatch.
- *  - When the CDN preconditions are not met (`development`, or an unbaked
- *    version/integrity — the two are baked from the `.widget-version` /
- *    `.widget-integrity` files a web release fans out) the bundled widget is
- *    inlined directly, exactly as before.
- *  - With neither a bundle nor a usable CDN pin we FAIL CLOSED: quietly fetching
- *    an unpinned script alongside the session config would turn a packaging bug
- *    into remote code execution.
+ *    Integrity pin meaningful: `BUILD_WIDGET_INTEGRITY` describes the exact bytes
+ *    at that exact path. Both WKWebView (WebKit) and Android WebView (Chromium)
+ *    enforce SRI, so a tampered bundle refuses to execute — not a blind "fetch and
+ *    run whatever the host returns".
+ *  - `development` is NOT excluded any more. It used to inline a vendored bundle
+ *    and never fetch, so the CDN, the SRI check and the failure path were only
+ *    ever exercised in staging/production. A dev build now loads the same pinned
+ *    bundle (its `cdnUrl` resolves to the prod CDN).
+ *  - There is NO fallback. A CDN outage, an offline device, or an SRI mismatch is
+ *    a HARD FAILURE: `onerror` posts WIDGET_LOAD_FAILED through the
+ *    ReactNativeWebView bridge so the host sees an error rather than a blank
+ *    WebView.
+ *  - With no usable pin we FAIL CLOSED: quietly fetching an unpinned script
+ *    alongside the session config would turn a packaging bug into RCE.
  *
- * `props.widgetUrl` remains an explicit developer override and takes precedence
- * over everything above.
+ * `props.widgetUrl` is a development-only override and takes precedence over the
+ * CDN; it is unpinned, since a widget you are rebuilding cannot satisfy a fixed
+ * hash.
  */
-export const WIDGET_BUNDLE_MISSING =
-  '[AddressIQ] The bundled widget (widgetBundle.ts) is empty, no CDN widget ' +
-  'version/integrity is baked in, and no `widgetUrl` override was supplied. This ' +
-  'is a packaging bug — reinstall @addressiq/react-native. The SDK will not load ' +
-  'an unpinned script from a remote host.';
+export const WIDGET_PIN_MISSING =
+  '[AddressIQ] No CDN widget version/integrity is baked in and no `widgetUrl` ' +
+  'override was supplied, so there is nothing safe to load. This is a packaging ' +
+  'bug — reinstall @addressiq/react-native. The SDK ships no bundled widget and ' +
+  'will not load an unpinned script from a remote host.';
+
+/** Error code reported when the pinned CDN widget fails to load. No fallback. */
+export const WIDGET_LOAD_FAILED = 'WIDGET_LOAD_FAILED';
 
 export interface WidgetHtmlConfig {
   apiKey: string;
   apiUrl: string;
   appUserId: string;
   businessName?: string;
-  /** Explicit developer override; wins over the CDN and the bundle. */
+  /** Development-only override; wins over the CDN. Unpinned. */
   widgetUrl?: string;
   deployment?: AddressIQDeployment;
   /** Per-deployment CDN base, from `resolveUrls().cdnUrl`. */
@@ -48,27 +51,18 @@ export interface WidgetHtmlConfig {
   /** Default to the baked constants; parameters only so tests can vary them. */
   widgetVersion?: string;
   widgetIntegrity?: string;
-  /** Default to the shipped bundle; a parameter only so tests can drop it. */
-  bundledJs?: string;
 }
 
-/** True when the baked pin allows the SRI-checked CDN load. */
+/**
+ * True when the baked pin allows the SRI-checked CDN load.
+ *
+ * `development` is no longer excluded — see the module header. It loads the same
+ * pinned bundle as everything else (its `cdnUrl` resolves to the prod CDN).
+ */
 export function cdnWidgetEnabled(cfg: WidgetHtmlConfig): boolean {
   const version = cfg.widgetVersion ?? BUILD_WIDGET_VERSION;
   const integrity = cfg.widgetIntegrity ?? BUILD_WIDGET_INTEGRITY;
-  // `development`'s "CDN" is the local dev host, which publishes no versioned,
-  // integrity-matching bundle.
-  return (
-    (cfg.deployment ?? 'production') !== 'development' &&
-    !!cfg.cdnUrl &&
-    !!version &&
-    !!integrity
-  );
-}
-
-/** Escapes `</` so the bundle cannot terminate the enclosing `<script>` block. */
-function scriptSafe(js: string): string {
-  return js.replace(/<\//g, '<\\/');
+  return !!cfg.cdnUrl && !!version && !!integrity;
 }
 
 export function buildHtml(cfg: WidgetHtmlConfig): string {
@@ -83,7 +77,6 @@ export function buildHtml(cfg: WidgetHtmlConfig): string {
   };
   if (cfg.businessName) config.business = { displayName: cfg.businessName };
 
-  const bundledJs = cfg.bundledJs ?? WIDGET_JS;
   const version = cfg.widgetVersion ?? BUILD_WIDGET_VERSION;
   const integrity = cfg.widgetIntegrity ?? BUILD_WIDGET_INTEGRITY;
 
@@ -91,23 +84,24 @@ export function buildHtml(cfg: WidgetHtmlConfig): string {
   if (cfg.widgetUrl) {
     widgetScript = `<script src="${cfg.widgetUrl}"></script>`;
   } else if (cdnWidgetEnabled(cfg)) {
-    const fallbackBody = bundledJs
-      ? `var s = document.createElement('script');
-    s.text = ${scriptSafe(JSON.stringify(bundledJs))};
-    document.head.appendChild(s);`
-      : `console.error('AddressIQ: widget failed to load and no bundled fallback is packaged.');`;
+    // The pinned CDN copy is the ONLY source — no vendored fallback. A CDN outage,
+    // an offline device, or an SRI mismatch fires onerror, which posts
+    // WIDGET_LOAD_FAILED through the ReactNativeWebView bridge so the host sees an
+    // error rather than a blank WebView.
     widgetScript = `<script>
-  function __iqWidgetFallback() {
-    // The remote (SRI-pinned) widget failed to load — CDN outage, offline, or an
-    // integrity mismatch. Fall back to the bundle we shipped.
-    ${fallbackBody}
+  function __iqWidgetLoadFailed() {
+    var msg = { kind: 'event', name: 'error', payload: {
+      code: '${WIDGET_LOAD_FAILED}',
+      message: 'AddressIQ: the widget could not be loaded from the CDN (outage, no '
+        + 'network, or a Subresource-Integrity mismatch). The SDK ships no bundled '
+        + 'copy, so there is nothing to fall back to.'
+    }};
+    try { window.ReactNativeWebView.postMessage(JSON.stringify(msg)); } catch (e) {}
   }
 </script>
-<script src="${cfg.cdnUrl}/v${version}/iqcollect.js" integrity="${integrity}" crossorigin="anonymous" onerror="__iqWidgetFallback()"></script>`;
-  } else if (bundledJs) {
-    widgetScript = `<script>${scriptSafe(bundledJs)}</script>`;
+<script src="${cfg.cdnUrl}/v${version}/iqcollect.js" integrity="${integrity}" crossorigin="anonymous" onerror="__iqWidgetLoadFailed()"></script>`;
   } else {
-    throw new Error(WIDGET_BUNDLE_MISSING);
+    throw new Error(WIDGET_PIN_MISSING);
   }
 
   return `<!doctype html><html><head>
@@ -117,9 +111,13 @@ export function buildHtml(cfg: WidgetHtmlConfig): string {
 <div id="mount"></div>
 ${widgetScript}
 <script>
-  var cfg = ${JSON.stringify(config)};
-  var c = new window.AddressIQ.IQCollect(document.getElementById('mount'), cfg);
-  c.open();
+  // Guarded: if the widget failed to load, window.AddressIQ is undefined and an
+  // unguarded \`new\` would throw an opaque error masking WIDGET_LOAD_FAILED.
+  if (window.AddressIQ && window.AddressIQ.IQCollect) {
+    var cfg = ${JSON.stringify(config)};
+    var c = new window.AddressIQ.IQCollect(document.getElementById('mount'), cfg);
+    c.open();
+  }
 </script>
 </body></html>`;
 }
