@@ -17,7 +17,7 @@ export default function SettingsSheet({ visible, session, onClose, onLogout, onR
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.title}>Settings</Text>
-          <Text style={styles.row}>Environment: {session.environment}</Text>
+          <Text style={styles.row}>Deployment: {session.deployment}</Text>
           <Text style={styles.row}>User: {session.appUserId}</Text>
           <Text style={styles.row}>{session.firstName} {session.lastName}</Text>
           <View style={styles.actions}>

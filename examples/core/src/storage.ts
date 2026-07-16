@@ -3,7 +3,7 @@ import type { VerifyResult } from '@addressiq/react-native';
 
 const KEYS = {
   loggedIn: 'aiq_logged_in',
-  environment: 'aiq_environment',
+  deployment: 'aiq_deployment',
   appUserId: 'aiq_app_user_id',
   firstName: 'aiq_first_name',
   lastName: 'aiq_last_name',
@@ -12,10 +12,10 @@ const KEYS = {
   addresses: 'aiq_verified_addresses',
 } as const;
 
-export type Environment = 'production' | 'staging' | 'development';
+export type Deployment = 'production' | 'staging' | 'development';
 
 export interface SessionData {
-  environment: Environment;
+  deployment: Deployment;
   appUserId: string;
   firstName: string;
   lastName: string;
@@ -26,11 +26,11 @@ export interface SessionData {
 export async function loadSession(): Promise<SessionData | null> {
   const loggedIn = await AsyncStorage.getItem(KEYS.loggedIn);
   if (loggedIn !== 'true') return null;
-  const environment = (await AsyncStorage.getItem(KEYS.environment)) as Environment | null;
+  const deployment = (await AsyncStorage.getItem(KEYS.deployment)) as Deployment | null;
   const appUserId = await AsyncStorage.getItem(KEYS.appUserId);
-  if (!environment || !appUserId) return null;
+  if (!deployment || !appUserId) return null;
   return {
-    environment,
+    deployment,
     appUserId,
     firstName: (await AsyncStorage.getItem(KEYS.firstName)) ?? '',
     lastName: (await AsyncStorage.getItem(KEYS.lastName)) ?? '',
@@ -42,7 +42,7 @@ export async function loadSession(): Promise<SessionData | null> {
 export async function saveSession(data: SessionData): Promise<void> {
   await AsyncStorage.multiSet([
     [KEYS.loggedIn, 'true'],
-    [KEYS.environment, data.environment],
+    [KEYS.deployment, data.deployment],
     [KEYS.appUserId, data.appUserId],
     [KEYS.firstName, data.firstName],
     [KEYS.lastName, data.lastName],

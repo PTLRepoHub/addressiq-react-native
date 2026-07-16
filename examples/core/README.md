@@ -117,18 +117,16 @@ npx react-native start --reset-cache
 # then reload the app (run-android / run-ios again, or press R twice)
 ```
 
-The widget UI is the **web** widget, embedded as a string in
-`src/ui/widgetBundle.ts`. After changing `addressiq-web`, rebuild and re-embed:
+The widget UI is the shared **web** widget, loaded from the SRI-pinned CDN at
+runtime. The SDK no longer embeds a copy, so there is nothing to re-embed. To try
+a widget you are changing, serve it yourself and point the SDK at it via the
+development-only `widgetUrl` prop (unpinned, since a rebuilt widget cannot satisfy
+the fixed SRI hash):
 
 ```bash
-cd addressiq-web && npx rollup -c          # → dist/iqcollect.js
-# re-embed into the SDKs (RN string wrapper + iOS/Android/Flutter assets):
-node -e '
-const fs=require("fs"); const js=fs.readFileSync("dist/iqcollect.js","utf8");
-const h="/* AUTO-GENERATED from @addressiq/iqcollect-web dist/iqcollect.js — do not edit. */\n/* eslint-disable */\n";
-fs.writeFileSync("../addressiq-react-native/src/ui/widgetBundle.ts", h+"export const WIDGET_JS: string = "+JSON.stringify(js)+";\n");
-for (const p of ["../addressiq-android/src/main/assets/iqcollect.js","../addressiq-flutter/assets/iqcollect.js","../addressiq-ios/Sources/AddressIQ/Resources/iqcollect.js"]) fs.writeFileSync(p, js);
-'
+cd addressiq-web && npx rollup -c && npx serve dist -p 5173   # → dist/iqcollect.js
+# then pass to <IQLocationManager>, development only:
+#   widgetUrl="http://<your-mac-ip>:5173/iqcollect.js"
 ```
 
 Then restart Metro with `--reset-cache` and reload.

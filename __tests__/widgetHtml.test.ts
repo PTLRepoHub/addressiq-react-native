@@ -1,79 +1,78 @@
 /**
- * How the verify WebView sources the widget JS: CDN-first with an SRI pin,
- * bundled fallback, fail-closed when neither is available.
+ * How the verify WebView sources the widget JS.
+ *
+ * The SRI-pinned CDN copy is now the ONLY source — the SDK no longer vendors a
+ * bundle. The tests that asserted the bundled fallback (embedded, development
+ * inlines it, an unbaked pin inlines it) are inverted, not deleted.
  */
 import { buildHtml, cdnWidgetEnabled, type WidgetHtmlConfig } from '../src/ui/widgetHtml';
-
-const BUNDLE = 'window.AddressIQ = {};';
 
 const base: WidgetHtmlConfig = {
   apiKey: 'aiq_test',
   apiUrl: 'https://api.addressiqpro.com',
   appUserId: 'cust_1',
-  environment: 'production',
+  deployment: 'production',
   cdnUrl: 'https://cdn.addressiqpro.com',
   widgetVersion: '0.4.0',
   widgetIntegrity: 'sha384-TESTHASH',
-  bundledJs: BUNDLE,
 };
 
 describe('buildHtml', () => {
-  it('loads the SRI-pinned CDN widget when the preconditions are met', () => {
+  it('loads the SRI-pinned CDN widget', () => {
     const html = buildHtml(base);
     expect(html).toContain('<script src="https://cdn.addressiqpro.com/v0.4.0/iqcollect.js"');
     expect(html).toContain('integrity="sha384-TESTHASH"');
     expect(html).toContain('crossorigin="anonymous"');
-    expect(html).toContain('onerror="__iqWidgetFallback()"');
   });
 
-  it('still embeds the bundle as the outage/offline/SRI fallback', () => {
+  it('development ALSO loads from the CDN — it no longer inlines a bundle', () => {
+    // The inversion. development used to be excluded and inline the vendored asset.
+    // (Its cdnUrl resolves to the prod CDN upstream; here we pass one explicitly.)
+    const html = buildHtml({ ...base, deployment: 'development' });
+    expect(html).toContain('<script src="https://cdn.addressiqpro.com/v0.4.0/iqcollect.js"');
+    expect(html).toContain('integrity="sha384-TESTHASH"');
+  });
+
+  it('ships no bundled widget and no fallback machinery', () => {
     const html = buildHtml(base);
-    // The fallback is DEFINED BEFORE the remote script it guards.
-    expect(html.indexOf('function __iqWidgetFallback')).toBeLessThan(
+    expect(html).not.toContain('__iqWidgetFallback');
+    expect(html).not.toContain('document.head.appendChild(s)');
+  });
+
+  it('reports WIDGET_LOAD_FAILED on failure instead of a blank WebView', () => {
+    const html = buildHtml(base);
+    expect(html).toContain('onerror="__iqWidgetLoadFailed()"');
+    expect(html).toContain('WIDGET_LOAD_FAILED');
+    expect(html).toContain('window.ReactNativeWebView.postMessage');
+    // Defined before the remote script it guards.
+    expect(html.indexOf('function __iqWidgetLoadFailed')).toBeLessThan(
       html.indexOf('<script src="https://cdn'),
     );
-    expect(html).toContain('document.head.appendChild(s)');
-    expect(html).toContain('window.AddressIQ');
   });
 
-  it('inlines the bundle and loads no remote script in development', () => {
-    const html = buildHtml({ ...base, environment: 'development', cdnUrl: 'http://localhost:4000' });
-    expect(html).toContain(`<script>${BUNDLE}</script>`);
-    expect(html).not.toContain('<script src=');
-    expect(html).not.toContain('integrity=');
+  it('guards the boot script so a failed load does not throw over the error', () => {
+    expect(buildHtml(base)).toContain('if (window.AddressIQ && window.AddressIQ.IQCollect)');
   });
 
-  it('inlines the bundle when the widget version or integrity is unbaked', () => {
-    const noVersion = buildHtml({ ...base, widgetVersion: '' });
-    expect(noVersion).toContain(`<script>${BUNDLE}</script>`);
-    expect(noVersion).not.toContain('<script src=');
-
-    const noIntegrity = buildHtml({ ...base, widgetIntegrity: '' });
-    expect(noIntegrity).toContain(`<script>${BUNDLE}</script>`);
-    expect(noIntegrity).not.toContain('integrity=');
-  });
-
-  it('honours an explicit widgetUrl override above the CDN and the bundle', () => {
+  it('honours an explicit widgetUrl override above the CDN, unpinned', () => {
     const html = buildHtml({ ...base, widgetUrl: 'http://localhost:8080/iqcollect.js' });
     expect(html).toContain('<script src="http://localhost:8080/iqcollect.js"></script>');
     expect(html).not.toContain('cdn.addressiqpro.com/v0.4.0');
+    expect(html).not.toContain('integrity=');
   });
 
-  it('fails closed with no bundle and no CDN pin', () => {
-    expect(() => buildHtml({ ...base, bundledJs: '', widgetVersion: '' })).toThrow(
-      /packaging bug/,
-    );
+  it('fails closed when the pin is unbaked and there is no override', () => {
+    // Previously this inlined the bundle. Now there is nothing to inline, and an
+    // unpinned remote script would be RCE — so it throws.
+    expect(() => buildHtml({ ...base, widgetVersion: '' })).toThrow(/packaging bug/);
+    expect(() => buildHtml({ ...base, widgetIntegrity: '' })).toThrow(/packaging bug/);
   });
 
-  it('is disabled when the widget pin is unbaked, enabled when it is present', () => {
-    // Assert on EXPLICIT empty pins, not on omitted fields. Omitting them falls
-    // back to BUILD_WIDGET_VERSION / BUILD_WIDGET_INTEGRITY, which are '' only
-    // until a web release fans out `.widget-version` / `.widget-integrity` — so
-    // the omitted-field version of this test passed for a transient reason and
-    // broke the moment the pins were actually baked.
+  it('cdnWidgetEnabled no longer excludes development', () => {
+    expect(cdnWidgetEnabled({ ...base, deployment: 'development' })).toBe(true);
+    expect(cdnWidgetEnabled(base)).toBe(true);
+    // …but an empty pin still disables it.
     expect(cdnWidgetEnabled({ ...base, widgetVersion: '', widgetIntegrity: '' })).toBe(false);
     expect(cdnWidgetEnabled({ ...base, widgetVersion: '0.5.1', widgetIntegrity: '' })).toBe(false);
-    expect(cdnWidgetEnabled({ ...base, widgetVersion: '', widgetIntegrity: 'sha384-x' })).toBe(false);
-    expect(cdnWidgetEnabled(base)).toBe(true);
   });
 });

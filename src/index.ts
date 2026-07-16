@@ -39,7 +39,7 @@ import type {
 // Re-exports
 export type {
   AddressIQConfig,
-  AddressIQEnvironment,
+  AddressIQDeployment,
   AddressIQTheme,
   AddressData,
   CollectResult,

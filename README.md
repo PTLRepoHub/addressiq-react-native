@@ -36,7 +36,7 @@ React Native ≥ 0.72 (TurboModule codegen). Runs in Expo via a dev build (not E
 ```ts
 import { initialize, setUser, startVerification } from '@addressiq/react-native';
 
-await initialize({ apiKey: 'aiq_live_…', environment: 'production' });
+await initialize({ apiKey: 'aiq_live_…', deployment: 'production' });
 await setUser({ appUserId: 'cust_123' });
 
 // Verify an address you already collected (see Collect UI below):
@@ -183,7 +183,7 @@ AddressIQ backend is running on `:4000`; otherwise use `staging`.
 
 ## Environment
 
-`environment: 'production' | 'staging' | 'development'` fully determines the
+`deployment: 'production' | 'staging' | 'development'` fully determines the
 base URLs — there is no URL override; integrators never pass a URL. `staging` is
 the canonical name across all AddressIQ SDKs.
 `development` targets a local backend on port `:4000` and is emulator-aware (the
@@ -199,40 +199,41 @@ in at publish time from GitHub repository variables (see
 ### How the verify widget is loaded
 
 `cdnUrl` is not just config — the verify WebView loads the widget from it, under
-a Subresource-Integrity pin. Resolution order (`src/ui/widgetHtml.ts:74-111`):
+a Subresource-Integrity pin. **This is the only source — the SDK no longer ships a
+bundled widget.** Resolution order (`src/ui/widgetHtml.ts`):
 
-1. **`widgetUrl`** — explicit developer override, wins over everything.
+1. **`widgetUrl`** — development-only override, wins over the CDN. Unpinned,
+   because a widget you are actively rebuilding cannot satisfy a fixed hash.
 2. **Pinned CDN build** — `{cdnUrl}/v{BUILD_WIDGET_VERSION}/iqcollect.js` loaded
-   with `integrity="{BUILD_WIDGET_INTEGRITY}" crossorigin="anonymous"`
-   (`widgetHtml.ts:106`). WKWebView (WebKit) and Android WebView (Chromium) both
-   **enforce** `integrity`, so the CDN can only execute the exact bytes hashed at
-   build time. The pair is baked into `src/generated/buildConfig.ts` from the
-   repo-root `.widget-version` / `.widget-integrity` files, which addressiq-web's
-   release fanout writes from the same build the CDN serves; CDN paths are
-   immutable (`/v{x.y.z}/`, no floating alias) because a mutable URL cannot be
-   SRI-pinned.
-3. **Bundled widget** (`WIDGET_JS` in `src/ui/widgetBundle.ts`) — the *fallback*,
-   injected by `onerror="__iqWidgetFallback()"`, covering a CDN outage, an
-   offline device **and** an SRI mismatch. It is also the only source when the
-   CDN path is off (`development`, or an unbaked version/integrity —
-   `cdnWidgetEnabled`, `widgetHtml.ts:56-68`).
+   with `integrity="{BUILD_WIDGET_INTEGRITY}" crossorigin="anonymous"`. WKWebView
+   (WebKit) and Android WebView (Chromium) both **enforce** `integrity`, so the
+   CDN can only execute the exact bytes hashed at build time. The pair is baked
+   into `src/generated/buildConfig.ts` from the repo-root `.widget-version` /
+   `.widget-integrity` files, which addressiq-web's release fanout writes from the
+   same build the CDN serves; CDN paths are immutable (`/v{x.y.z}/`, no floating
+   alias) because a mutable URL cannot be SRI-pinned. The checked-in default is the
+   currently published pin. `development` is **not** excluded any more: it loads
+   the same pinned bundle (its `cdnUrl` defaults to the prod CDN, overridable with
+   `ADDRESSIQ_DEV_CDN_URL`).
 
-With neither a pinned CDN build nor the bundle the SDK still **fails closed**
-(`WIDGET_BUNDLE_MISSING`, `widgetHtml.ts:110`) — it never loads an unpinned
-remote script.
+> **There is no fallback, and verification now depends on the CDN.** A CDN outage,
+> an offline device, or an SRI mismatch is a **hard failure**: `onerror` posts
+> `WIDGET_LOAD_FAILED` through the `ReactNativeWebView` bridge → `onError`, rather
+> than leaving a blank WebView. The SDK previously vendored a `WIDGET_JS` copy and
+> degraded to it; that copy is gone. **The collect UI cannot render without a
+> network.**
 
-Three details in that markup are load-bearing — each fails *silently* toward
-"looks fine, but never actually uses the CDN":
+With no pinned CDN build (empty version/integrity) and no override the SDK still
+**fails closed** (`WIDGET_PIN_MISSING`) — it never loads an unpinned remote script.
 
-- `crossorigin="anonymous"` is **mandatory**: without it the cross-origin
-  response is opaque, `integrity` cannot be evaluated, and every load hard-fails
-  into the fallback.
-- **Script order**: a blocking classic `<script>` fires `onerror` before the
-  parser reaches the next inline script, so `__iqWidgetFallback()` is defined
-  *before* the remote tag (which carries no `defer`/`async`).
-- The inlined fallback bundle is **escaped** (`scriptSafe`, `widgetHtml.ts:70`)
-  — it contains `</script>`-alike sequences that would otherwise terminate the
-  tag.
+Two details in that markup are load-bearing:
+
+- `crossorigin="anonymous"` is **mandatory**: without it the cross-origin response
+  is opaque, `integrity` cannot be evaluated, and every load hard-fails.
+- **Script order**: a blocking classic `<script>` fires `onerror` before the parser
+  reaches the next inline script, so `__iqWidgetLoadFailed()` is defined *before*
+  the remote tag (which carries no `defer`/`async`). The boot script is guarded on
+  `window.AddressIQ` so a failed load surfaces the reported error.
 
 ## Errors
 
@@ -296,3 +297,98 @@ Requires the `NPM_TOKEN` repository secret. Run the workflow manually with
 
 Fork, branch, PR. CI builds the SDK, runs the smoke test, and type-checks both
 examples against the local SDK on every push/PR.
+
+## Running the SDK locally, end to end
+
+Everything below is **development-only**. Every override is honoured solely under
+the `development` deployment and **throws** on a staging or production build, even
+if the variable is set — a build-time value must never be able to point a shipped
+app at an arbitrary host.
+
+### 1. Start the backend
+
+```sh
+cd addressiq-node-backend
+cp .env.example .env          # set GOOGLE_MAPS_API_KEY if you want the map to load
+npm install && npm start      # http://localhost:4000
+```
+
+It must bind `0.0.0.0`, not `127.0.0.1`, or nothing off-machine can reach it.
+
+### 2. (Optional) Serve the widget yourself
+
+Only needed if you are **changing the widget**. Otherwise the SDK uses the widget
+it already ships.
+
+```sh
+cd addressiq-web
+npx rollup -c                 # → dist/iqcollect.js
+npx serve dist -p 5173
+```
+
+Then set `ADDRESSIQ_DEV_WIDGET_URL` to `http://<host>:5173/iqcollect.js` for live
+reload without re-vendoring. Point it at a **published** URL
+(`https://cdn.addressiqpro.com/v0.5.3/iqcollect.js`) instead to exercise the
+pinned CDN bundle — though `development` now loads that by default, so this is only
+for pointing at a widget you are serving yourself.
+
+A `file://` path will **not** work: the Android emulator is a separate VM and
+cannot see your filesystem, and a physical device certainly cannot. It has to be
+served over HTTP.
+
+### 3. Point the SDK at your machine
+
+```sh
+cp .env.example .env
+```
+
+**Which host do I use?**
+
+| Running on | Host |
+|---|---|
+| Android emulator | `10.0.2.2` — a special alias for your machine's localhost |
+| iOS simulator | `localhost` — it shares your Mac's network |
+| **Physical device (either OS)** | your **LAN IP** — `ipconfig getifaddr en0` |
+
+The default is the emulator/simulator literal, which is exactly why these
+overrides exist: **a physical device cannot reach `10.0.2.2` or `localhost`.**
+
+React Native ships source and has no build step, so `process.env` is undefined at
+runtime in a bare app — the **host app** passes the values to `initialize()` from
+its own env:
+
+```ts
+import Config from "react-native-config";   // or your dotenv setup
+
+initialize({
+  apiKey: Config.ADDRESSIQ_API_KEY,
+  deployment: "development",
+  devApiUrl: Config.ADDRESSIQ_DEV_API_URL,
+  devIngestUrl: Config.ADDRESSIQ_DEV_INGEST_URL,
+});
+```
+
+### 4. Android only: allow plain HTTP
+
+A LAN IP over plain `http://` is blocked by default. In your **debug** manifest:
+
+```xml
+<application android:usesCleartextTraffic="true" …>
+```
+
+Debug only — never in a release. (A `network_security_config` scoped to that one
+host is the tighter version.)
+
+### Troubleshooting
+
+- **Requests hang / connection refused on a real device** — the backend is bound to
+  `127.0.0.1`. Bind `0.0.0.0`.
+- **Works on the emulator, fails on a device** — you are still on `10.0.2.2`. Set a
+  LAN IP.
+- **Android: `net::ERR_CLEARTEXT_NOT_PERMITTED`** — step 4.
+- **The map is blank** — your backend has no Maps key. `GET /api/v1/widget/config`
+  supplies it; set `GOOGLE_MAPS_API_KEY` in the backend's `.env`. (The key is
+  platform-provisioned; no native SDK accepts one, because the key is used by the
+  widget, not by native code.)
+- **An override "does nothing"** — check `deployment` is `development`. Anywhere
+  else it throws rather than being silently ignored, so you would have seen an error.

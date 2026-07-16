@@ -13,7 +13,7 @@ describe('api.startVerification (digital)', () => {
 
   beforeEach(() => {
     resetConfig();
-    setConfig({ apiKey: 'aiq_test_key', environment: 'development' });
+    setConfig({ apiKey: 'aiq_test_key', deployment: 'development' });
     fetchMock = jest.fn(async () => ({
       ok: true,
       status: 201,
