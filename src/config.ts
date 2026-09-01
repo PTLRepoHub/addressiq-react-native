@@ -8,10 +8,7 @@ import {
   BUILD_PROD_WIDGET_INTEGRITY,
   BUILD_PROD_WIDGET_VERSION,
   BUILD_STAGING_API_URL,
-  BUILD_STAGING_CDN_URL,
   BUILD_STAGING_INGEST_URL,
-  BUILD_STAGING_WIDGET_INTEGRITY,
-  BUILD_STAGING_WIDGET_VERSION,
 } from './generated/buildConfig';
 
 /**
@@ -76,11 +73,23 @@ export function devOverride(
  *
  * The verify WebView loads the widget from `cdnUrl`, SRI-pinned: the immutable,
  * version-addressed `{cdnUrl}/v{widgetVersion}/iqcollect.js` checked against
- * `widgetIntegrity`. The version + hash are PER DEPLOYMENT — staging and prod
- * publish independently and their bundles differ byte-for-byte (per-environment
- * Maps key), so a single global pin cannot match both. `development` reuses the
- * prod CDN + prod pin (the local backend serves no versioned widget); override the
- * host with devCdnUrl / ADDRESSIQ_DEV_CDN_URL.
+ * `widgetIntegrity`.
+ *
+ * EVERY deployment loads it from the PRODUCTION CDN, matching the Android and
+ * iOS SDKs. The bundle is environment-agnostic at runtime — it bakes both
+ * environments' API and ingest hosts and switches on the deployment the SDK
+ * hands it — so production bytes drive a staging verification correctly. Only
+ * the baked Google Maps key differs.
+ *
+ * Pointing staging at the staging CDN, which is what this did, made the widget
+ * fragile in a way nothing else was: the two bundles are deliberately NOT
+ * byte-identical, and staging publishes on its own schedule, so a build was
+ * correct only while its staging pin matched whatever that CDN happened to be
+ * serving. A prebuilt demo APK shipped with the prod pin and the staging CDN,
+ * and every verification on it died with an SRI mismatch and a blank widget.
+ * The staging pin is no longer read for that reason.
+ *
+ * Override the host with devCdnUrl / ADDRESSIQ_DEV_CDN_URL (development only).
  */
 const DEPLOYMENT_URLS: Record<AddressIQDeployment, DeploymentURLs> = {
   production: {
@@ -95,18 +104,21 @@ const DEPLOYMENT_URLS: Record<AddressIQDeployment, DeploymentURLs> = {
   staging: {
     apiUrl: BUILD_STAGING_API_URL,
     ingestUrl: BUILD_STAGING_INGEST_URL,
-    cdnUrl: BUILD_STAGING_CDN_URL,
-    widgetVersion: BUILD_STAGING_WIDGET_VERSION,
-    widgetIntegrity: BUILD_STAGING_WIDGET_INTEGRITY,
+    // Production CDN and pin, deliberately — see the note above. The deployment
+    // still selects the API and ingest hosts; the widget switches to them at
+    // runtime from the config the SDK passes it.
+    cdnUrl: BUILD_PROD_CDN_URL,
+    widgetVersion: BUILD_PROD_WIDGET_VERSION,
+    widgetIntegrity: BUILD_PROD_WIDGET_INTEGRITY,
     privacyPolicyUrl: 'https://staging.addressiqpro.com/privacy',
     termsUrl: 'https://staging.addressiqpro.com/terms',
   },
   development: {
     apiUrl: DEV_HOST,
     ingestUrl: DEV_HOST,
-    // A dev build loads the real pinned widget from the production CDN + prod pin
-    // (the local backend serves no /v{x.y.z}/iqcollect.js); override the host with
-    // devCdnUrl / ADDRESSIQ_DEV_CDN_URL.
+    // Same production CDN + pin as the others. The local backend serves no
+    // /v{x.y.z}/iqcollect.js of its own; override the host with devCdnUrl /
+    // ADDRESSIQ_DEV_CDN_URL.
     cdnUrl: BUILD_PROD_CDN_URL,
     widgetVersion: BUILD_PROD_WIDGET_VERSION,
     widgetIntegrity: BUILD_PROD_WIDGET_INTEGRITY,

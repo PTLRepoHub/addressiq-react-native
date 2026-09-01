@@ -14,6 +14,11 @@
 # environment — the widget pin, PER DEPLOYMENT:
 #
 #   .widget-version-staging / .widget-integrity-staging
+#     STILL GENERATED, BUT NO LONGER READ BY THE SDK. Every deployment loads the
+#     widget from the PRODUCTION CDN (see DEPLOYMENT_URLS in src/config.ts), so
+#     only the prod pin is consulted. They are kept because the web repo's CDN
+#     workflow writes them and other tooling reads them; do not assume a stale
+#     staging pin can break a build any more.
 #   .widget-version-prod    / .widget-integrity-prod
 #
 # staging and prod publish independently (different versions) and their bundles

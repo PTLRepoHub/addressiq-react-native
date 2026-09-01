@@ -1,13 +1,15 @@
 /**
- * Per-deployment widget pin selection.
+ * Widget pin selection.
  *
- * staging and prod publish the widget independently: they can serve different
- * VERSIONS, and their bundles can differ byte-for-byte (per-environment Maps
- * key) → different SRI hashes. So the version + integrity are resolved PER
- * DEPLOYMENT and the CDN <script> must carry the ones for the selected
- * deployment. (The two pins MAY currently coincide — same version, same key —
- * which is fine; the contract is that each deployment resolves to ITS OWN
- * configured pin, not that the values always differ.)
+ * This used to assert the opposite: that each deployment resolved to its own
+ * pin, staging included. That was the design, and it was fragile — the staging
+ * bundle is deliberately not byte-identical to production and publishes on its
+ * own schedule, so a build was correct only while its staging pin matched what
+ * that CDN happened to be serving. A prebuilt demo APK carried the prod pin
+ * with the staging CDN and every verification on it died with an SRI mismatch.
+ *
+ * Every deployment now loads the widget from the production CDN, matching
+ * Android and iOS. See __tests__/widgetCdnPinning.test.ts for the invariant.
  */
 import { setConfig, resolveUrls, resetConfig } from '../src/config';
 import { buildHtml } from '../src/ui/widgetHtml';
@@ -21,12 +23,14 @@ import {
 describe('per-deployment widget pin', () => {
   afterEach(() => resetConfig());
 
-  it('staging resolves the staging pin from the staging CDN', () => {
+  it('staging resolves the PROD pin, not the staging one', () => {
     setConfig({ apiKey: 'aiq_test_k', deployment: 'staging' });
     const urls = resolveUrls();
-    expect(urls.widgetVersion).toBe(BUILD_STAGING_WIDGET_VERSION);
-    expect(urls.widgetIntegrity).toBe(BUILD_STAGING_WIDGET_INTEGRITY);
-    expect(urls.cdnUrl).toContain('cdn-staging');
+    expect(urls.widgetVersion).toBe(BUILD_PROD_WIDGET_VERSION);
+    expect(urls.widgetIntegrity).toBe(BUILD_PROD_WIDGET_INTEGRITY);
+    expect(urls.cdnUrl).not.toContain('cdn-staging');
+    // The staging pin is still generated, and is now simply not read.
+    expect(urls.widgetIntegrity).not.toBe(BUILD_STAGING_WIDGET_INTEGRITY);
   });
 
   it('production resolves the prod pin', () => {
