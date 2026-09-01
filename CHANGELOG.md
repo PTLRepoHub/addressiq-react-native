@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.9.0...v0.10.0) (2026-09-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* `environment` is renamed to `deployment`, and `'sandbox'` is rejected at runtime. Integrators passing the old key or value must update.
+* The SDK no longer ships a vendored `iqcollect.js`. The widget is loaded from the CDN at runtime against a pinned version and SRI hash.
+
+### Features
+
+* **config:** rename `environment` to `deployment`; reject `'sandbox'` at runtime
+* **config:** dev-only host overrides for local development
+* **widget:** drop the vendored bundle; the pinned CDN copy is the only source
+* **signals:** collect device intelligence and attach it as `rawPayload`. The SDK sent none, so EMULATOR_DETECTED, MOCK_LOCATION, ROOTED_DEVICE and the install-id blacklist were all unreachable on React Native — a compromised device scored like an honest one.
+
+### Bug Fixes
+
+* **telemetry:** stop sending `verificationId` on the envelope. Ingest validates with `forbidNonWhitelisted`, so it rejected the entire 50-event batch with a 400, and the queue re-tried the same payload forever while storing nothing.
+
 ## [0.9.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.8.1...v0.9.0) (2026-07-12)
 
 

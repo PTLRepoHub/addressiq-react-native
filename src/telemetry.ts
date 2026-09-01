@@ -34,7 +34,7 @@ import type { LocationReading, GeofenceTransition } from './types';
  * `deviceOs` is IOS/ANDROID here too, and a bare semver collides across SDKs.
  * Tokens match the idempotency-key vocabulary (`iqidem_rn_*`), contract §6.6.
  */
-const SDK_VERSION = 'rn/0.9.0';
+const SDK_VERSION = 'rn/0.10.0';
 const BATCH_THRESHOLD = 10;
 const FLUSH_INTERVAL_MS = 120_000;
 const STORAGE_KEY = '@addressiq/rn-telemetry-queue';
