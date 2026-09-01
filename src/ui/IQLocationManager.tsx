@@ -42,20 +42,23 @@ export default function IQLocationManager(props: IQLocationManagerProps) {
   }, [props.apiKey, props.deployment]);
   const apiUrl = urls.apiUrl;
   const cdnUrl = urls.cdnUrl;
+  const widgetVersion = urls.widgetVersion;
+  const widgetIntegrity = urls.widgetIntegrity;
   const widgetUrl = props.widgetUrl;
   const deployment = props.deployment ?? 'production';
 
   const html = useMemo(
     () => buildHtml({
       apiKey: props.apiKey,
-      apiUrl,
       appUserId: props.appUserId,
       businessName: props.businessName,
       widgetUrl,
       deployment,
       cdnUrl,
+      widgetVersion,
+      widgetIntegrity,
     }),
-    [props.apiKey, apiUrl, cdnUrl, deployment, props.appUserId, props.businessName, widgetUrl],
+    [props.apiKey, apiUrl, cdnUrl, widgetVersion, widgetIntegrity, deployment, props.appUserId, props.businessName, widgetUrl],
   );
 
   const reply = useCallback((id: string, result: unknown, error?: unknown) => {

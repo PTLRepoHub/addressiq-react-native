@@ -25,11 +25,16 @@ export type AddressIQDeployment = 'production' | 'staging' | 'development';
 export interface DeploymentURLs {
   apiUrl: string;
   ingestUrl: string;
-  /**
-   * CDN base URL for the deployment. Resolved config only — the SDK does not
-   * load the widget from here; the bundled asset is the only widget source.
-   */
+  /** CDN base URL the verify WebView loads the widget from, for this deployment. */
   cdnUrl: string;
+  /**
+   * Widget version + SRI hash to load from `cdnUrl` for THIS deployment. Pinned
+   * per deployment because staging and prod publish independently and their
+   * bundles differ byte-for-byte (per-environment Maps key) — one global pin
+   * cannot match both. `''` when no pin is baked.
+   */
+  widgetVersion: string;
+  widgetIntegrity: string;
   privacyPolicyUrl: string;
   termsUrl: string;
 }

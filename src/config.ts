@@ -5,9 +5,13 @@ import {
   BUILD_PROD_API_URL,
   BUILD_PROD_CDN_URL,
   BUILD_PROD_INGEST_URL,
+  BUILD_PROD_WIDGET_INTEGRITY,
+  BUILD_PROD_WIDGET_VERSION,
   BUILD_STAGING_API_URL,
   BUILD_STAGING_CDN_URL,
   BUILD_STAGING_INGEST_URL,
+  BUILD_STAGING_WIDGET_INTEGRITY,
+  BUILD_STAGING_WIDGET_VERSION,
 } from './generated/buildConfig';
 
 /**
@@ -70,17 +74,21 @@ export function devOverride(
  * scripts/bake-build-config.sh); `development` is deliberately NOT baked — it
  * points at the host machine's backend, so it stays the DEV_HOST literal above.
  *
- * The verify WebView loads the widget from `cdnUrl`, CDN-first: the immutable,
- * version-addressed `{cdnUrl}/v{x.y.z}/iqcollect.js` with a Subresource-Integrity
- * pin (BUILD_WIDGET_INTEGRITY) — the ONLY source, since the SDK ships no bundled
- * copy. A failed load surfaces WIDGET_LOAD_FAILED (see src/ui/widgetHtml.ts).
- * `development` is not excluded: it loads the same pinned widget from the prod CDN.
+ * The verify WebView loads the widget from `cdnUrl`, SRI-pinned: the immutable,
+ * version-addressed `{cdnUrl}/v{widgetVersion}/iqcollect.js` checked against
+ * `widgetIntegrity`. The version + hash are PER DEPLOYMENT — staging and prod
+ * publish independently and their bundles differ byte-for-byte (per-environment
+ * Maps key), so a single global pin cannot match both. `development` reuses the
+ * prod CDN + prod pin (the local backend serves no versioned widget); override the
+ * host with devCdnUrl / ADDRESSIQ_DEV_CDN_URL.
  */
 const DEPLOYMENT_URLS: Record<AddressIQDeployment, DeploymentURLs> = {
   production: {
     apiUrl: BUILD_PROD_API_URL,
     ingestUrl: BUILD_PROD_INGEST_URL,
     cdnUrl: BUILD_PROD_CDN_URL,
+    widgetVersion: BUILD_PROD_WIDGET_VERSION,
+    widgetIntegrity: BUILD_PROD_WIDGET_INTEGRITY,
     privacyPolicyUrl: 'https://addressiqpro.com/privacy',
     termsUrl: 'https://addressiqpro.com/terms',
   },
@@ -88,16 +96,20 @@ const DEPLOYMENT_URLS: Record<AddressIQDeployment, DeploymentURLs> = {
     apiUrl: BUILD_STAGING_API_URL,
     ingestUrl: BUILD_STAGING_INGEST_URL,
     cdnUrl: BUILD_STAGING_CDN_URL,
+    widgetVersion: BUILD_STAGING_WIDGET_VERSION,
+    widgetIntegrity: BUILD_STAGING_WIDGET_INTEGRITY,
     privacyPolicyUrl: 'https://staging.addressiqpro.com/privacy',
     termsUrl: 'https://staging.addressiqpro.com/terms',
   },
   development: {
     apiUrl: DEV_HOST,
     ingestUrl: DEV_HOST,
-    // NOT the dev host: the local backend serves no /v{x.y.z}/iqcollect.js, and the
-    // SDK ships no bundled copy. A dev build loads the real pinned widget from the
-    // production CDN; override with devCdnUrl / ADDRESSIQ_DEV_CDN_URL.
+    // A dev build loads the real pinned widget from the production CDN + prod pin
+    // (the local backend serves no /v{x.y.z}/iqcollect.js); override the host with
+    // devCdnUrl / ADDRESSIQ_DEV_CDN_URL.
     cdnUrl: BUILD_PROD_CDN_URL,
+    widgetVersion: BUILD_PROD_WIDGET_VERSION,
+    widgetIntegrity: BUILD_PROD_WIDGET_INTEGRITY,
     privacyPolicyUrl: 'http://localhost:3000/privacy',
     termsUrl: 'http://localhost:3000/terms',
   },

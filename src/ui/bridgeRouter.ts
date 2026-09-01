@@ -1,4 +1,16 @@
 import type { CollectResult } from '../types';
+import type { WidgetLoadFailureReason } from './widgetHtml';
+
+/**
+ * Error surfaced through `onError`. `code` is the widget's error code (e.g.
+ * `WIDGET_LOAD_FAILED`); `reason` narrows a load failure to its actual cause and
+ * `detail` carries the supporting evidence — the served hash, the HTTP status.
+ */
+export interface WidgetError extends Error {
+  code?: string;
+  reason?: WidgetLoadFailureReason;
+  detail?: string;
+}
 
 /**
  * Pure protocol logic for the web-widget bridge. Decodes the `HostBridge`
@@ -53,9 +65,19 @@ export function routeBridgeMessage(raw: string, sinks: BridgeSinks): void {
       case 'close':
         sinks.onCancelled();
         break;
-      case 'error':
-        sinks.onFailed(new Error(p.message ?? 'Widget reported an error'));
+      case 'error': {
+        // `code`/`reason`/`detail` ride along as properties rather than being
+        // flattened into the message: WIDGET_LOAD_FAILED carries a machine-readable
+        // cause (NETWORK_UNREACHABLE / HTTP_ERROR / SRI_MISMATCH / …) that a host
+        // wants to branch on — retry vs. surface "you're offline" vs. page an
+        // on-call about a bad publish — not merely print.
+        const err = new Error(p.message ?? 'Widget reported an error') as WidgetError;
+        if (p.code) err.code = p.code;
+        if (p.reason) err.reason = p.reason;
+        if (p.detail) err.detail = p.detail;
+        sinks.onFailed(err);
         break;
+      }
     }
     return;
   }

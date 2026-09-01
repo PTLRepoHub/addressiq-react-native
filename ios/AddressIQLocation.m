@@ -21,6 +21,8 @@ RCT_EXTERN_METHOD(requestBackgroundLocationPermission:(RCTPromiseResolveBlock)re
 RCT_EXTERN_METHOD(requestFullAccuracy:(NSString *)purposeKey
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(collectDeviceSignals:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(isMockLocationDetected:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 

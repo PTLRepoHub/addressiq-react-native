@@ -218,8 +218,10 @@ export async function cancelVerification(
 
 export async function listProviders(type?: 'digital' | 'physical'): Promise<ProviderEntry[]> {
   const { apiUrl } = resolveUrls();
-  const url = new URL(`${apiUrl}/api/v1/providers`);
-  if (type) url.searchParams.set('type', type);
-  const res = await fetch(url.toString(), { method: 'GET', headers: buildHeaders() });
+  // Build the query with a template string rather than `new URL()`: React
+  // Native's built-in URL implementation appends a trailing slash to the path,
+  // which turns `/api/v1/providers` into a 404 `/api/v1/providers/`.
+  const query = type ? `?type=${encodeURIComponent(type)}` : '';
+  const res = await fetch(`${apiUrl}/api/v1/providers${query}`, { method: 'GET', headers: buildHeaders() });
   return jsonOrThrow<ProviderEntry[]>(res);
 }

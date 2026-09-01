@@ -18,3 +18,8 @@ ios/build/
 .env
 .env.*
 !.env.example
+
+# Build artefacts from the example apps. A release APK is ~54MB and is
+# reproducible from source; see BUILD-EXAMPLE-APKS.md.
+*.apk
+.DS_Store

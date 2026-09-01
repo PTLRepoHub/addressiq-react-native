@@ -80,7 +80,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "0.9.0"
         // react-native-maps Google Maps key for Android base tiles. Read from
         // the build environment so the live key never lands in tracked source
         // (mirrors the iOS SIMCTL_CHILD_GOOGLE_MAPS_KEY injection). Empty by

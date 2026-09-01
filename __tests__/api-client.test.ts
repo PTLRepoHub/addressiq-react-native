@@ -6,7 +6,7 @@
  * runs without a network or React Native runtime.
  */
 import { setConfig, resetConfig } from '../src/config';
-import { startVerification } from '../src/api';
+import { startVerification, listProviders } from '../src/api';
 
 describe('api.startVerification (digital)', () => {
   let fetchMock: jest.Mock;
@@ -57,5 +57,39 @@ describe('api.startVerification (digital)', () => {
     });
     const [, init] = fetchMock.mock.calls[0];
     expect(JSON.parse(init.body)).toEqual({ digitalProvider: 'dojah_digital' });
+  });
+});
+
+describe('api.listProviders (URL construction)', () => {
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    resetConfig();
+    setConfig({ apiKey: 'aiq_test_key', deployment: 'development' });
+    fetchMock = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify([]),
+    }));
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = fetchMock;
+  });
+
+  afterEach(() => {
+    resetConfig();
+  });
+
+  // Regression: React Native's built-in `URL` appends a trailing slash, which
+  // turned this GET into a 404 `/api/v1/providers/`. The path must be exact.
+  it('GETs /api/v1/providers with no trailing slash', async () => {
+    await listProviders();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://localhost:4000/api/v1/providers');
+    expect(init.method).toBe('GET');
+  });
+
+  it('appends ?type= when a provider type is given', async () => {
+    await listProviders('physical');
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://localhost:4000/api/v1/providers?type=physical');
   });
 });

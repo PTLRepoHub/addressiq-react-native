@@ -52,3 +52,215 @@ jobs:
           else
             npm publish --access public
           fi
+
+  # ---------------------------------------------------------------------------
+  # Demo app builds from examples/core (the bare RN example, which carries real
+  # android/ and ios/ projects — the Expo example has no native projects).
+  #
+  # Both link the LOCAL SDK via `file:../..`, so the demo on the release page is
+  # the version being published.
+  #
+  # Secrets (iOS): APPSTORE_KEY_ID, APPSTORE_ISSUER_ID, APPSTORE_KEY_P8,
+  # APPLE_TEAM_ID. Absent → unsigned build, no TestFlight, release still gets an
+  # artifact.
+  # Variables: IOS_DEMO_BUNDLE_ID, ANDROID_DEMO_APPLICATION_ID.
+  # ---------------------------------------------------------------------------
+  demo-android:
+    name: Demo APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Bake build config (staging + production)
+        env:
+          STAGING_ADDRESSIQ_API_BASE_URL: ${{ vars.STAGING_ADDRESSIQ_API_BASE_URL }}
+          STAGING_ADDRESSIQ_INGEST_BASE_URL: ${{ vars.STAGING_ADDRESSIQ_INGEST_BASE_URL }}
+          STAGING_ADDRESSIQ_CDN_BASE_URL: ${{ vars.STAGING_ADDRESSIQ_CDN_BASE_URL }}
+          PROD_ADDRESSIQ_API_BASE_URL: ${{ vars.PROD_ADDRESSIQ_API_BASE_URL }}
+          PROD_ADDRESSIQ_INGEST_BASE_URL: ${{ vars.PROD_ADDRESSIQ_INGEST_BASE_URL }}
+          PROD_ADDRESSIQ_CDN_BASE_URL: ${{ vars.PROD_ADDRESSIQ_CDN_BASE_URL }}
+        run: scripts/bake-build-config.sh --strict
+
+      # The example consumes the SDK as `file:../..`, so the library has to be
+      # built before the example installs it.
+      - run: npm install && npm run build
+      - run: npm --prefix examples/core install
+
+      - name: Build APK
+        id: apk
+        working-directory: examples/core/android
+        env:
+          APP_ID: ${{ vars.ANDROID_DEMO_APPLICATION_ID || 'com.addressiqcore' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.0"; fi
+          # The RN template's `release` buildType signs with the debug keystore,
+          # so this APK installs. Not a Play-Store-grade signature — a partner
+          # build would need a real keystore wired into app/build.gradle.
+          # app/build.gradle hardcodes these; patch them in place rather than
+          # inventing gradle properties the build file does not read.
+          sed -i.bak -E "s/applicationId \"[^\"]*\"/applicationId \"${APP_ID}\"/;\
+                         s/versionName \"[^\"]*\"/versionName \"${V}\"/;\
+                         s/versionCode [0-9]+/versionCode ${{ github.run_number }}/" app/build.gradle
+          ./gradlew assembleRelease --no-daemon
+          SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          mv "$SRC" "../../../addressiq-react-native-example-${V}.apk"
+          echo "artifact=addressiq-react-native-example-${V}.apk" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: ${{ steps.apk.outputs.artifact }}
+
+      - name: Attach to the GitHub release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.apk.outputs.artifact }}" --clobber
+
+  demo-ios:
+    name: Demo app · TestFlight
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      SCHEME: AddressIQCore
+      BUNDLE_ID: ${{ vars.IOS_DEMO_BUNDLE_ID || 'com.addressiqpro.rndemo' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: false
+
+      - name: Bake build config (staging + production)
+        env:
+          STAGING_ADDRESSIQ_API_BASE_URL: ${{ vars.STAGING_ADDRESSIQ_API_BASE_URL }}
+          STAGING_ADDRESSIQ_INGEST_BASE_URL: ${{ vars.STAGING_ADDRESSIQ_INGEST_BASE_URL }}
+          STAGING_ADDRESSIQ_CDN_BASE_URL: ${{ vars.STAGING_ADDRESSIQ_CDN_BASE_URL }}
+          PROD_ADDRESSIQ_API_BASE_URL: ${{ vars.PROD_ADDRESSIQ_API_BASE_URL }}
+          PROD_ADDRESSIQ_INGEST_BASE_URL: ${{ vars.PROD_ADDRESSIQ_INGEST_BASE_URL }}
+          PROD_ADDRESSIQ_CDN_BASE_URL: ${{ vars.PROD_ADDRESSIQ_CDN_BASE_URL }}
+        run: scripts/bake-build-config.sh --strict
+
+      - run: npm install && npm run build
+      - run: npm --prefix examples/core install
+      - name: pod install
+        working-directory: examples/core/ios
+        run: |
+          gem install cocoapods --no-document
+          pod install --repo-update
+
+      - name: Install the App Store Connect API key
+        id: asc
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPSTORE_KEY_ID:-}" ] || [ -z "${APPSTORE_ISSUER_ID:-}" ] \
+             || [ -z "${APPSTORE_KEY_P8:-}" ] || [ -z "${APPLE_TEAM_ID:-}" ]; then
+            echo "::warning::App Store Connect secrets not configured — building unsigned, skipping TestFlight."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p ~/private_keys
+          printf '%s' "$APPSTORE_KEY_P8" > ~/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Archive + export
+        id: build
+        working-directory: examples/core
+        env:
+          SIGNED: ${{ steps.asc.outputs.signed }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.0"; fi
+          # The checked-in project uses the react-native template's placeholder
+          # bundle id; TestFlight needs the real registered App ID.
+          COMMON=(-workspace "ios/$SCHEME.xcworkspace" -scheme "$SCHEME" -configuration Release
+                  -destination 'generic/platform=iOS'
+                  PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"
+                  MARKETING_VERSION="$V"
+                  CURRENT_PROJECT_VERSION="${{ github.run_number }}")
+
+          if [ "$SIGNED" != "true" ]; then
+            xcodebuild build "${COMMON[@]}" -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+            APP=$(find build/Build/Products -maxdepth 2 -name '*.app' | head -1)
+            OUT="$PWD/../../addressiq-react-native-example-${V}-unsigned.zip"
+            ( cd "$(dirname "$APP")" && zip -qry "$OUT" "$(basename "$APP")" )
+            echo "artifact=addressiq-react-native-example-${V}-unsigned.zip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          KEY=~/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8
+          xcodebuild archive "${COMMON[@]}" \
+            -archivePath build/"$SCHEME".xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic
+
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><dict>' \
+            '<key>method</key><string>app-store-connect</string>' \
+            "<key>teamID</key><string>${APPLE_TEAM_ID}</string>" \
+            '<key>destination</key><string>export</string>' \
+            '<key>signingStyle</key><string>automatic</string>' \
+            '<key>uploadSymbols</key><true/>' \
+            '</dict></plist>' > build/ExportOptions.plist
+
+          xcodebuild -exportArchive \
+            -archivePath build/"$SCHEME".xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+
+          IPA=$(find build/export -name '*.ipa' | head -1)
+          mv "$IPA" "../../addressiq-react-native-example-${V}.ipa"
+          echo "artifact=addressiq-react-native-example-${V}.ipa" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to TestFlight
+        if: steps.asc.outputs.signed == 'true'
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcrun altool --upload-app -t ios \
+            -f "${{ steps.build.outputs.artifact }}" \
+            --apiKey "$APPSTORE_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-demo
+          path: ${{ steps.build.outputs.artifact }}
+
+      - name: Attach to the GitHub release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.build.outputs.artifact }}" --clobber

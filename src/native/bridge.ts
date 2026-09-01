@@ -37,6 +37,10 @@ function buildFallback(): Spec {
     requestBackgroundLocationPermission: async () => false,
     requestFullAccuracy: async () => true,
     isMockLocationDetected: async () => false,
+    // Deliberately empty rather than fabricated: an absent native module can
+    // observe nothing, and reporting `isEmulator: false` here would assert
+    // something the fallback cannot know.
+    collectDeviceSignals: async () => ({}),
     getCurrentLocation: (highAccuracy: boolean) =>
       new Promise((resolve, reject) => {
         const geo = (globalThis as { navigator?: { geolocation?: unknown } }).navigator?.geolocation as

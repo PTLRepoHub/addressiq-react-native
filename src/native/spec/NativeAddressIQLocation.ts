@@ -32,6 +32,13 @@ export interface Spec extends TurboModule {
    */
   requestFullAccuracy(purposeKey: string): Promise<boolean>;
   isMockLocationDetected(): Promise<boolean>;
+  /**
+   * Device intelligence attached to every transit event as `rawPayload`.
+   * Loosely typed because the sections are additive: the server reads the
+   * paths it knows and ignores the rest, so adding a signal natively must not
+   * require a coordinated TypeScript release.
+   */
+  collectDeviceSignals(): Promise<Record<string, Record<string, unknown>>>;
 
   // Foreground reading
   getCurrentLocation(highAccuracy: boolean): Promise<{

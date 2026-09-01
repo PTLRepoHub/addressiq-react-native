@@ -1,5 +1,5 @@
 PODS:
-  - AddressIQLocation (0.1.0):
+  - AddressIQLocation (0.9.0):
     - React-Core
   - boost (1.83.0)
   - DoubleConversion (1.1.6)
@@ -1404,7 +1404,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  AddressIQLocation: 7bcf557df3bc7a4366bb6d3f60f38f89e94df019
+  AddressIQLocation: a33d8689f6d318ed6403221a45458c6b8e5053c5
   boost: d3f49c53809116a5d38da093a8aa78bf551aed09
   DoubleConversion: 76ab83afb40bddeeee456813d9c04f67f78771b5
   FBLazyVector: ac12dc084d1c8ec4cc4d7b3cf1b0ebda6dab85af

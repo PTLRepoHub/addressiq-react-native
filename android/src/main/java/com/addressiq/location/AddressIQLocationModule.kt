@@ -154,6 +154,124 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
     promise.resolve(false)
   }
 
+  /**
+   * Device intelligence for the transit-event envelope.
+   *
+   * The scoring engine reads these out of `rawPayload` — `device.isEmulator`
+   * becomes EMULATOR_DETECTED, `location.isMocked` becomes MOCK_LOCATION,
+   * `security.isRooted` becomes ROOTED_DEVICE, and `fingerprint.installId`
+   * keys both DEVICE_CHANGE and the device blacklist. This SDK sent none of
+   * them, so on a React Native app every one of those checks was unreachable:
+   * an emulator with a mocked location scored exactly like an honest phone.
+   *
+   * Deliberately cheap and non-authoritative. These are heuristics an attacker
+   * can defeat; they exist to raise the cost, and the server treats them as
+   * evidence rather than proof. Play Integrity is the hardened answer and is
+   * tracked separately.
+   */
+  @ReactMethod
+  fun collectDeviceSignals(promise: Promise) {
+    val signals = Arguments.createMap()
+
+    val device = Arguments.createMap()
+    device.putBoolean("isEmulator", isProbablyEmulator())
+    device.putString("model", Build.MODEL)
+    device.putString("manufacturer", Build.MANUFACTURER)
+    device.putString("osVersion", Build.VERSION.RELEASE)
+    signals.putMap("device", device)
+
+    val security = Arguments.createMap()
+    security.putBoolean("isRooted", isProbablyRooted())
+    signals.putMap("security", security)
+
+    val fingerprint = Arguments.createMap()
+    fingerprint.putString("installId", installId())
+    signals.putMap("fingerprint", fingerprint)
+
+    promise.resolve(signals)
+  }
+
+  /**
+   * Emulator heuristic.
+   *
+   * The widely-copied version of this check tests `FINGERPRINT.startsWith
+   * ("generic")`, `MODEL.contains("google_sdk")` and friends — and it does not
+   * fire on a current Android Studio AVD, which reports
+   * `google/sdk_gphone16k_arm64/emu64a16k` with `dev-keys`. Verified against a
+   * real API 37 image: every one of those legacy predicates returns false.
+   *
+   * `ro.hardware` (`ranchu`/`goldfish`) and `ro.kernel.qemu` are what actually
+   * hold, so they lead here. The legacy checks are kept for older images and
+   * Genymotion. A determined attacker patches all of this, which is why it is
+   * one signal among several rather than a gate on its own.
+   */
+  private fun isProbablyEmulator(): Boolean {
+    val hardware = systemProperty("ro.hardware")
+    if (hardware == "ranchu" || hardware == "goldfish" || hardware == "vbox86") return true
+    if (systemProperty("ro.kernel.qemu").isNotEmpty()) return true
+    if (systemProperty("ro.boot.qemu") == "1") return true
+
+    return Build.FINGERPRINT.startsWith("generic") ||
+      Build.FINGERPRINT.startsWith("unknown") ||
+      Build.MODEL.startsWith("sdk_") ||
+      Build.PRODUCT.startsWith("sdk_") ||
+      Build.DEVICE.startsWith("emu") ||
+      Build.MODEL.contains("google_sdk") ||
+      Build.MODEL.contains("Emulator") ||
+      Build.MODEL.contains("Android SDK built for") ||
+      Build.MANUFACTURER.contains("Genymotion") ||
+      (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")) ||
+      "google_sdk" == Build.PRODUCT
+  }
+
+  /**
+   * Read a system property reflectively.
+   *
+   * `android.os.SystemProperties` is hidden API, so this is the supported way
+   * to reach `ro.hardware` and `ro.kernel.qemu` — the two properties that
+   * actually identify a modern emulator. Returns "" on any failure, which the
+   * caller treats as "not observed" rather than "not an emulator".
+   */
+  private fun systemProperty(key: String): String = runCatching {
+    @Suppress("PrivateApi")
+    val clazz = Class.forName("android.os.SystemProperties")
+    val get = clazz.getMethod("get", String::class.java)
+    (get.invoke(null, key) as? String).orEmpty()
+  }.getOrDefault("")
+
+  /** Presence of a superuser binary or a test-keys build. */
+  private fun isProbablyRooted(): Boolean {
+    if (Build.TAGS?.contains("test-keys") == true) return true
+    val paths = arrayOf(
+      "/system/app/Superuser.apk",
+      "/sbin/su",
+      "/system/bin/su",
+      "/system/xbin/su",
+      "/data/local/xbin/su",
+      "/data/local/bin/su",
+      "/system/sd/xbin/su",
+      "/system/bin/failsafe/su",
+      "/data/local/su",
+      "/su/bin/su",
+    )
+    return paths.any { runCatching { java.io.File(it).exists() }.getOrDefault(false) }
+  }
+
+  /**
+   * A per-install identifier, generated once and kept in the app's private
+   * prefs. Not a hardware id: it dies with the install, which is exactly the
+   * privacy property we want — it links a device across a verification without
+   * being a durable cross-app identifier.
+   */
+  private fun installId(): String {
+    val prefs = reactApplicationContext
+      .getSharedPreferences("addressiq_sdk", Context.MODE_PRIVATE)
+    prefs.getString("installId", null)?.let { return it }
+    val generated = java.util.UUID.randomUUID().toString()
+    prefs.edit().putString("installId", generated).apply()
+    return generated
+  }
+
   // ── Foreground reading ──────────────────────────────────────────────
 
   @ReactMethod

@@ -23,10 +23,18 @@
  */
 
 import { getConfig, resolveUrls } from './config';
-import { getNativeEmitter } from './native/bridge';
+import { getNativeEmitter, getNativeModule } from './native/bridge';
 import type { LocationReading, GeofenceTransition } from './types';
 
-const SDK_VERSION = '0.1.0';
+/**
+ * Reported as `sdkVersion` on every event. Bump the number with the release
+ * tag, and keep the `rn/` prefix.
+ *
+ * The prefix is the only thing identifying which SDK produced an event:
+ * `deviceOs` is IOS/ANDROID here too, and a bare semver collides across SDKs.
+ * Tokens match the idempotency-key vocabulary (`iqidem_rn_*`), contract §6.6.
+ */
+const SDK_VERSION = 'rn/0.9.0';
 const BATCH_THRESHOLD = 10;
 const FLUSH_INTERVAL_MS = 120_000;
 const STORAGE_KEY = '@addressiq/rn-telemetry-queue';
@@ -50,7 +58,13 @@ type EventType =
 interface TelemetryEnvelope {
   eventId: string;
   locationId: string;
-  verificationId?: string;
+  // NOTE: no `verificationId`. The ingest DTO does not declare it and the
+  // service validates with `forbidNonWhitelisted`, so including it rejects the
+  // WHOLE 50-event batch with a 400 — and flushQueue() re-queues on failure, so
+  // it would retry the same rejected payload forever while nothing is stored
+  // and nothing is logged. The server resolves the verification from the
+  // geofence registered against `locationId`, so the field was redundant as
+  // well as fatal.
   eventType: EventType;
   lat?: number;
   lon?: number;
@@ -64,12 +78,20 @@ interface TelemetryEnvelope {
   deviceTimestamp: string;
   /** Legacy field kept for backward compat with old ingest consumers. */
   deviceTs: string;
+  /**
+   * Device intelligence. The scoring engine reads `device.isEmulator`,
+   * `location.isMocked`, `security.isRooted` and `fingerprint.installId` out of
+   * here — without it EMULATOR_DETECTED, MOCK_LOCATION, ROOTED_DEVICE and the
+   * device blacklist are all unreachable, and this SDK sent nothing at all.
+   * `rawPayload` is declared on the ingest DTO, so it passes whitelist
+   * validation.
+   */
+  rawPayload?: Record<string, unknown>;
 }
 
 let queue: TelemetryEnvelope[] = [];
 let lastFlushAt = 0;
 let sessionLocationId: string | null = null;
-let sessionVerificationId: string | null = null;
 let listenersInstalled = false;
 let locationSub: { remove(): void } | null = null;
 let geofenceSub: { remove(): void } | null = null;
@@ -127,14 +149,18 @@ function uuidv4(): string {
 }
 
 /**
- * Bind a verification session so subsequent native events are packaged
- * with the correct `locationId` / `verificationId`. Called automatically
- * from `startPhysical()` / `startCombined()`. Triggers a one-time load
- * of any events persisted from a previous app launch.
+ * Bind a verification session so subsequent native events are packaged with the
+ * correct `locationId`. Called automatically from `startPhysical()` /
+ * `startCombined()`. Triggers a one-time load of any events persisted from a
+ * previous app launch.
+ *
+ * `verificationId` is accepted for API compatibility and deliberately not
+ * stored: it must never reach the wire (see TelemetryEnvelope), and the server
+ * resolves the verification from the geofence registered against `locationId`.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function setSession(locationId: string, verificationId: string | null = null): void {
   sessionLocationId = locationId;
-  sessionVerificationId = verificationId;
   installListenersOnce();
   if (!persistedLoaded) {
     void loadPersistedQueue();
@@ -144,7 +170,6 @@ export function setSession(locationId: string, verificationId: string | null = n
 /** Detach the session. Subsequent events are dropped silently. */
 export function clearSession(): void {
   sessionLocationId = null;
-  sessionVerificationId = null;
 }
 
 /**
@@ -191,7 +216,7 @@ export function wipeTelemetry(): void {
   queue = [];
   lastFlushAt = 0;
   sessionLocationId = null;
-  sessionVerificationId = null;
+  deviceSignalsPromise = null;
   locationSub?.remove();
   geofenceSub?.remove();
   locationSub = null;
@@ -205,6 +230,40 @@ export function wipeTelemetry(): void {
 }
 
 // ── Internals ──────────────────────────────────────────────────────────
+
+/**
+ * Device signals, fetched once per session.
+ *
+ * These do not change while the app runs, and the collector touches the
+ * filesystem, so paying for it on every geofence transition would be waste.
+ * Cached as a promise so concurrent events share one native round-trip.
+ */
+let deviceSignalsPromise: Promise<Record<string, Record<string, unknown>>> | null = null;
+
+function deviceSignals(): Promise<Record<string, Record<string, unknown>>> {
+  deviceSignalsPromise ??= getNativeModule()
+    .collectDeviceSignals()
+    // Never let a signal failure cost us the event itself: an event with no
+    // device section still scores on presence, which is strictly better than
+    // dropping it.
+    .catch(() => ({}));
+  return deviceSignalsPromise;
+}
+
+/**
+ * Merge the per-reading mock flag into the collected sections.
+ *
+ * `location.isMocked` is per-fix, not per-device — Android reports it on the
+ * individual reading — so it cannot come from the cached collector.
+ */
+function buildRawPayload(
+  signals: Record<string, Record<string, unknown>>,
+  isMock: boolean | undefined,
+): Record<string, unknown> | undefined {
+  const payload: Record<string, unknown> = { ...signals };
+  if (isMock !== undefined) payload.location = { isMocked: isMock };
+  return Object.keys(payload).length > 0 ? payload : undefined;
+}
 
 function installListenersOnce(): void {
   if (listenersInstalled) return;
@@ -220,10 +279,10 @@ function installListenersOnce(): void {
 
 async function enqueueLocation(reading: LocationReading): Promise<void> {
   if (!sessionLocationId) return;
+  const signals = await deviceSignals();
   pushBounded({
     eventId: uuidv4(),
     locationId: sessionLocationId,
-    verificationId: sessionVerificationId ?? undefined,
     eventType: 'BACKGROUND_CHECK',
     lat: reading.lat,
     lon: reading.lon,
@@ -232,6 +291,7 @@ async function enqueueLocation(reading: LocationReading): Promise<void> {
     sdkVersion: SDK_VERSION,
     deviceTimestamp: new Date(reading.timestampMs).toISOString(),
     deviceTs: new Date(reading.timestampMs).toISOString(),
+    rawPayload: buildRawPayload(signals, reading.isMock),
   });
   void persistQueue();
   await maybeFlush();
@@ -245,10 +305,10 @@ async function enqueueGeofence(transition: GeofenceTransition): Promise<void> {
     DWELL: 'DWELL',
   };
   const ts = transition.timestampMs ?? Date.now();
+  const signals = await deviceSignals();
   pushBounded({
     eventId: uuidv4(),
     locationId: sessionLocationId,
-    verificationId: sessionVerificationId ?? undefined,
     eventType: eventTypeMap[transition.transition],
     lat: transition.lat,
     lon: transition.lon,
@@ -257,6 +317,9 @@ async function enqueueGeofence(transition: GeofenceTransition): Promise<void> {
     sdkVersion: SDK_VERSION,
     deviceTimestamp: new Date(ts).toISOString(),
     deviceTs: new Date(ts).toISOString(),
+    // A geofence transition carries no per-fix mock flag; the device sections
+    // still apply.
+    rawPayload: buildRawPayload(signals, undefined),
   });
   void persistQueue();
   await maybeFlush();

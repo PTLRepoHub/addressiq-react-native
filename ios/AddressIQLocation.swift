@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import UIKit
 import React
 
 /**
@@ -129,6 +130,87 @@ class AddressIQLocation: RCTEventEmitter, CLLocationManagerDelegate {
     // level. Per-reading hardening (App Attest, course/speed sanity)
     // ships in the canonical iOS SDK and a follow-up slice wires it here.
     resolve(false)
+  }
+
+  /**
+   Device intelligence for the transit-event envelope.
+
+   The scoring engine reads these out of `rawPayload`: `device.isEmulator`
+   becomes EMULATOR_DETECTED, `security.isRooted` becomes ROOTED_DEVICE, and
+   `fingerprint.installId` keys both DEVICE_CHANGE and the device blacklist.
+   This SDK sent none of them, so on a React Native app every one of those
+   checks was unreachable.
+
+   Heuristics, not proof — cheap signals the server weighs as evidence. App
+   Attest is the hardened answer and is tracked separately.
+   */
+  @objc(collectDeviceSignals:rejecter:)
+  func collectDeviceSignals(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    resolve([
+      "device": [
+        "isEmulator": Self.isSimulator,
+        "model": UIDevice.current.model,
+        "osVersion": UIDevice.current.systemVersion,
+      ],
+      "security": [
+        // "Rooted" is the engine's cross-platform name; on iOS the equivalent
+        // condition is a jailbreak.
+        "isRooted": Self.isJailbroken,
+      ],
+      "fingerprint": [
+        "installId": Self.installId,
+      ],
+    ])
+  }
+
+  /// Compile-time on the simulator, so it cannot be patched at runtime.
+  private static var isSimulator: Bool {
+    #if targetEnvironment(simulator)
+    return true
+    #else
+    return false
+    #endif
+  }
+
+  /// Presence of the usual jailbreak artefacts, plus a write outside the
+  /// sandbox — which only succeeds on a jailbroken device.
+  private static var isJailbroken: Bool {
+    #if targetEnvironment(simulator)
+    return false
+    #else
+    let paths = [
+      "/Applications/Cydia.app",
+      "/Library/MobileSubstrate/MobileSubstrate.dylib",
+      "/bin/bash",
+      "/usr/sbin/sshd",
+      "/etc/apt",
+      "/private/var/lib/apt/",
+    ]
+    if paths.contains(where: { FileManager.default.fileExists(atPath: $0) }) { return true }
+    let probe = "/private/jailbreak-probe.txt"
+    do {
+      try "probe".write(toFile: probe, atomically: true, encoding: .utf8)
+      try? FileManager.default.removeItem(atPath: probe)
+      return true
+    } catch {
+      return false
+    }
+    #endif
+  }
+
+  /**
+   A per-install identifier, generated once and kept in UserDefaults.
+
+   Not a hardware id: it dies with the install, which is the privacy property
+   we want — it links a device across one verification without being a durable
+   cross-app identifier.
+   */
+  private static var installId: String {
+    let key = "com.addressiq.installId"
+    if let existing = UserDefaults.standard.string(forKey: key) { return existing }
+    let generated = UUID().uuidString
+    UserDefaults.standard.set(generated, forKey: key)
+    return generated
   }
 
   // ── Foreground reading ──────────────────────────────────────────────

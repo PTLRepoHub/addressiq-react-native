@@ -10,17 +10,19 @@
 # `development` is NOT baked: it points at the host machine's backend, so it is
 # a local concern and stays the DEV_HOST literal in src/config.ts.
 #
-# TWO further constants come from FILES at the repo root, NOT from the
-# environment:
+# FOUR further constants come from FILES at the repo root, NOT from the
+# environment — the widget pin, PER DEPLOYMENT:
 #
-#   .widget-version    e.g. "v0.4.0"      -> widget version (leading "v" stripped)
-#   .widget-integrity  e.g. "sha384-abc…" -> SRI hash of that widget bundle
+#   .widget-version-staging / .widget-integrity-staging
+#   .widget-version-prod    / .widget-integrity-prod
 #
-# Both are written by the widget-fanout workflow in addressiq-web on every web
-# release, next to the vendored widget bundle. They pin the CDN copy of the
-# widget ({cdn}/v{version}/iqcollect.js). They are OPTIONAL: when the files are
-# absent (or empty) both constants bake to "" and the SDK inlines the bundled
-# widget instead — so --strict does NOT require them, only the six URL vars.
+# staging and prod publish independently (different versions) and their bundles
+# differ byte-for-byte (per-environment Maps key), so a single global pin cannot
+# satisfy both. Written by the widget-fanout workflow in addressiq-web. They are
+# OPTIONAL: absent/empty -> "" (the SDK then has no CDN pin for that deployment)
+# — so --strict does NOT require them, only the six URL vars. Legacy fallback:
+# the old single .widget-version / .widget-integrity fills BOTH when the per-env
+# files are absent.
 #
 # Usage:
 #   scripts/bake-build-config.sh            # unset vars keep their defaults (local)
@@ -69,20 +71,32 @@ while IFS='|' read -r name default; do
 done <<< "$DEFAULTS"
 
 
-# .widget-version / .widget-integrity are repo-root FILES (see header). Absent
-# or empty -> "". Never required, not even under --strict: they legitimately do
-# not exist until the first widget fan-out lands.
+# The widget pins are repo-root FILES (see header), PER DEPLOYMENT:
+#   .widget-version-staging / .widget-integrity-staging
+#   .widget-version-prod    / .widget-integrity-prod
+# Absent or empty -> "". Never required, not even under --strict: they
+# legitimately do not exist until the first widget fan-out lands. For
+# back-compat, the legacy single .widget-version / .widget-integrity (the
+# prod-fanned pin) is the fallback for BOTH when the per-env files are absent.
 read_widget_file() {
   [ -f "$1" ] || { printf ''; return 0; }
   # trim whitespace/newlines
   tr -d '\r\n' < "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
-WIDGET_VERSION="$(read_widget_file .widget-version)"
 # The file carries a "vX.Y.Z" tag; the CDN path is built as /v{version}/, so
 # strip the leading "v" here and keep exactly one source of the prefix.
-WIDGET_VERSION="${WIDGET_VERSION#v}"
-WIDGET_INTEGRITY="$(read_widget_file .widget-integrity)"
+STAGING_WIDGET_VERSION="$(read_widget_file .widget-version-staging)"
+[ -n "$STAGING_WIDGET_VERSION" ] || STAGING_WIDGET_VERSION="$(read_widget_file .widget-version)"
+STAGING_WIDGET_VERSION="${STAGING_WIDGET_VERSION#v}"
+STAGING_WIDGET_INTEGRITY="$(read_widget_file .widget-integrity-staging)"
+[ -n "$STAGING_WIDGET_INTEGRITY" ] || STAGING_WIDGET_INTEGRITY="$(read_widget_file .widget-integrity)"
+
+PROD_WIDGET_VERSION="$(read_widget_file .widget-version-prod)"
+[ -n "$PROD_WIDGET_VERSION" ] || PROD_WIDGET_VERSION="$(read_widget_file .widget-version)"
+PROD_WIDGET_VERSION="${PROD_WIDGET_VERSION#v}"
+PROD_WIDGET_INTEGRITY="$(read_widget_file .widget-integrity-prod)"
+[ -n "$PROD_WIDGET_INTEGRITY" ] || PROD_WIDGET_INTEGRITY="$(read_widget_file .widget-integrity)"
 
 if [ -n "$missing" ]; then
   echo "::error::--strict: required build variables are unset:$missing" >&2
@@ -101,12 +115,12 @@ cat > "$OUT" <<EOF
  *   STAGING_ADDRESSIQ_INGEST_BASE_URL  PROD_ADDRESSIQ_INGEST_BASE_URL
  *   STAGING_ADDRESSIQ_CDN_BASE_URL     PROD_ADDRESSIQ_CDN_BASE_URL
  *
- * TWO further constants are baked from FILES at the repo root rather than from
- * the environment — \`.widget-version\` and \`.widget-integrity\`, written by the
- * widget-fanout workflow in addressiq-web on every web release alongside the
- * vendored widget bundle. They pin the CDN copy of the widget
- * (\`{cdn}/v{version}/iqcollect.js\` + its SRI hash). When the files are absent
- * both constants bake to '' and the SDK simply inlines the bundled widget.
+ * The widget pin is baked from FILES at the repo root, PER DEPLOYMENT —
+ * \`.widget-version-{staging,prod}\` and \`.widget-integrity-{staging,prod}\`,
+ * written by the widget-fanout workflow in addressiq-web. staging and prod
+ * publish independently and their bundles differ byte-for-byte (per-environment
+ * Maps key), so each deployment pins its own \`{cdn}/v{version}/iqcollect.js\`
+ * + SRI hash. Absent files bake to '' (no CDN pin for that deployment).
  *
  * The checked-in values below are the safe public defaults, so a local
  * \`npm run build\` and the test suite resolve real hosts with no substitution.
@@ -130,13 +144,20 @@ export const BUILD_PROD_API_URL = '$V_PROD_ADDRESSIQ_API_BASE_URL';
 export const BUILD_PROD_INGEST_URL = '$V_PROD_ADDRESSIQ_INGEST_BASE_URL';
 export const BUILD_PROD_CDN_URL = '$V_PROD_ADDRESSIQ_CDN_BASE_URL';
 
-/** Widget version published to the CDN, WITHOUT the leading \`v\` (e.g. \`0.4.0\`).
- *  Baked from the \`.widget-version\` file; \`''\` when absent. */
-export const BUILD_WIDGET_VERSION = '$WIDGET_VERSION';
+// Widget pins are PER DEPLOYMENT: staging and prod publish independently and
+// their bundles differ byte-for-byte (per-environment Maps key), so their SRI
+// hashes differ — a single global pin cannot satisfy both. \`''\` when absent.
+// \`development\` reuses the PROD pins (its cdnUrl is the prod CDN).
 
-/** Subresource-Integrity hash of \`{cdn}/v{version}/iqcollect.js\` (e.g. \`sha384-…\`).
- *  Baked from the \`.widget-integrity\` file; \`''\` when absent. */
-export const BUILD_WIDGET_INTEGRITY = '$WIDGET_INTEGRITY';
+/** Staging widget version on the CDN, WITHOUT the leading \`v\` (e.g. \`0.4.2\`). */
+export const BUILD_STAGING_WIDGET_VERSION = '$STAGING_WIDGET_VERSION';
+/** SRI hash of \`{staging cdn}/v{version}/iqcollect.js\`. */
+export const BUILD_STAGING_WIDGET_INTEGRITY = '$STAGING_WIDGET_INTEGRITY';
+
+/** Production widget version on the CDN, WITHOUT the leading \`v\` (e.g. \`0.5.3\`). */
+export const BUILD_PROD_WIDGET_VERSION = '$PROD_WIDGET_VERSION';
+/** SRI hash of \`{prod cdn}/v{version}/iqcollect.js\`. */
+export const BUILD_PROD_WIDGET_INTEGRITY = '$PROD_WIDGET_INTEGRITY';
 EOF
 
 echo "[bake] wrote $OUT"

@@ -8,12 +8,12 @@
  *   STAGING_ADDRESSIQ_INGEST_BASE_URL  PROD_ADDRESSIQ_INGEST_BASE_URL
  *   STAGING_ADDRESSIQ_CDN_BASE_URL     PROD_ADDRESSIQ_CDN_BASE_URL
  *
- * TWO further constants are baked from FILES at the repo root rather than from
- * the environment — `.widget-version` and `.widget-integrity`, written by the
- * widget-fanout workflow in addressiq-web on every web release alongside the
- * vendored widget bundle. They pin the CDN copy of the widget
- * (`{cdn}/v{version}/iqcollect.js` + its SRI hash). When the files are absent
- * both constants bake to '' and the SDK simply inlines the bundled widget.
+ * The widget pin is baked from FILES at the repo root, PER DEPLOYMENT —
+ * `.widget-version-{staging,prod}` and `.widget-integrity-{staging,prod}`,
+ * written by the widget-fanout workflow in addressiq-web. staging and prod
+ * publish independently and their bundles differ byte-for-byte (per-environment
+ * Maps key), so each deployment pins its own `{cdn}/v{version}/iqcollect.js`
+ * + SRI hash. Absent files bake to '' (no CDN pin for that deployment).
  *
  * The checked-in values below are the safe public defaults, so a local
  * `npm run build` and the test suite resolve real hosts with no substitution.
@@ -37,11 +37,17 @@ export const BUILD_PROD_API_URL = 'https://api.addressiqpro.com';
 export const BUILD_PROD_INGEST_URL = 'https://ingest-api.addressiqpro.com';
 export const BUILD_PROD_CDN_URL = 'https://cdn.addressiqpro.com';
 
-/** Widget version published to the CDN, WITHOUT the leading `v` (e.g. `0.4.0`).
- *  Baked from the `.widget-version` file; `''` when absent. */
-export const BUILD_WIDGET_VERSION = '0.5.3';
+// Widget pins are PER DEPLOYMENT: staging and prod publish independently and
+// their bundles differ byte-for-byte (per-environment Maps key), so their SRI
+// hashes differ — a single global pin cannot satisfy both. `''` when absent.
+// `development` reuses the PROD pins (its cdnUrl is the prod CDN).
 
-/** Subresource-Integrity hash of `{cdn}/v{version}/iqcollect.js` (e.g. `sha384-…`).
- *  Baked from the `.widget-integrity` file; `''` when absent. */
-export const BUILD_WIDGET_INTEGRITY =
-  'sha384-wUErWmll1WWgesjXvSN93KLxHTDLNXdZ4FMR9nT2tQ7tpdBdEuQCDMkHgdssRvkb';
+/** Staging widget version on the CDN, WITHOUT the leading `v` (e.g. `0.4.2`). */
+export const BUILD_STAGING_WIDGET_VERSION = '0.5.3';
+/** SRI hash of `{staging cdn}/v{version}/iqcollect.js`. */
+export const BUILD_STAGING_WIDGET_INTEGRITY = 'sha384-Q7LZd2vji9K0ulAu866ywpCzIj0aoaZAl9n9Ghw1lkf8aT84y++RT/9rHcAIuYJB';
+
+/** Production widget version on the CDN, WITHOUT the leading `v` (e.g. `0.5.3`). */
+export const BUILD_PROD_WIDGET_VERSION = '0.5.3';
+/** SRI hash of `{prod cdn}/v{version}/iqcollect.js`. */
+export const BUILD_PROD_WIDGET_INTEGRITY = 'sha384-wUErWmll1WWgesjXvSN93KLxHTDLNXdZ4FMR9nT2tQ7tpdBdEuQCDMkHgdssRvkb';
