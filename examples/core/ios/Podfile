@@ -38,5 +38,18 @@ target 'AddressIQCore' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Pin every pod to the same deployment target as the app.
+    #
+    # Several pods ship a default of 9.0/11.0. Building them below the app's
+    # target makes the linker reach for the Swift back-deployment shims
+    # (swiftCompatibility56, swiftCompatibilityConcurrency), which current
+    # Xcode no longer ships — the archive then fails with "Undefined symbols
+    # for architecture arm64", which is what broke the TestFlight job.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      end
+    end
   end
 end
