@@ -7,7 +7,7 @@ require Pod::Executable.execute_command('node', ['-p',
 
 # Bumped from min_ios_version_supported (13.4) to 15.1 — react-native-maps@1.26
 # (the Collect UI map flow's optional peer dep) requires iOS 15.1.
-platform :ios, '15.1'
+platform :ios, '16.0'
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
@@ -41,14 +41,15 @@ target 'AddressIQCore' do
 
     # Pin every pod to the same deployment target as the app.
     #
-    # Several pods ship a default of 9.0/11.0. Building them below the app's
-    # target makes the linker reach for the Swift back-deployment shims
-    # (swiftCompatibility56, swiftCompatibilityConcurrency), which current
-    # Xcode no longer ships — the archive then fails with "Undefined symbols
-    # for architecture arm64", which is what broke the TestFlight job.
+    # 16.0, not the SDK's own floor. `swiftCompatibility56` back-deploys Swift
+    # 5.6 to systems older than iOS 15.4, and current Xcode no longer ships
+    # those shims — so anything built below 15.4 fails to link with "Undefined
+    # symbols for architecture arm64". 15.1 was not enough; it is under the
+    # boundary. This governs only the DEMO APP: the SDK keeps its iOS 13 floor,
+    # declared in AddressIQLocation.podspec, and integrators are unaffected.
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
       end
     end
   end
