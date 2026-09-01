@@ -205,7 +205,7 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
    * Genymotion. A determined attacker patches all of this, which is why it is
    * one signal among several rather than a gate on its own.
    */
-  private fun isProbablyEmulator(): Boolean {
+  internal fun isProbablyEmulator(): Boolean {
     val hardware = systemProperty("ro.hardware")
     if (hardware == "ranchu" || hardware == "goldfish" || hardware == "vbox86") return true
     if (systemProperty("ro.kernel.qemu").isNotEmpty()) return true
@@ -232,7 +232,7 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
    * actually identify a modern emulator. Returns "" on any failure, which the
    * caller treats as "not observed" rather than "not an emulator".
    */
-  private fun systemProperty(key: String): String = runCatching {
+  internal fun systemProperty(key: String): String = runCatching {
     @Suppress("PrivateApi")
     val clazz = Class.forName("android.os.SystemProperties")
     val get = clazz.getMethod("get", String::class.java)
@@ -240,7 +240,7 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
   }.getOrDefault("")
 
   /** Presence of a superuser binary or a test-keys build. */
-  private fun isProbablyRooted(): Boolean {
+  internal fun isProbablyRooted(): Boolean {
     if (Build.TAGS?.contains("test-keys") == true) return true
     val paths = arrayOf(
       "/system/app/Superuser.apk",
@@ -263,7 +263,7 @@ class AddressIQLocationModule(private val reactCtx: ReactApplicationContext) :
    * privacy property we want — it links a device across a verification without
    * being a durable cross-app identifier.
    */
-  private fun installId(): String {
+  internal fun installId(): String {
     val prefs = reactApplicationContext
       .getSharedPreferences("addressiq_sdk", Context.MODE_PRIVATE)
     prefs.getString("installId", null)?.let { return it }

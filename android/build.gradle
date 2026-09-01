@@ -29,6 +29,11 @@ android {
   defaultConfig {
     minSdkVersion safeMinSdk
     targetSdkVersion safeTargetSdk
+    // The signal collector asks the platform what it is running on. That can
+    // only be answered on a device, and "could not answer" reported as a clean
+    // device is how two of the native SDK's fraud signals stayed silently
+    // broken. See src/androidTest.
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
   }
 
   compileOptions {
@@ -46,6 +51,8 @@ repositories {
 }
 
 dependencies {
+  androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+  androidTestImplementation 'androidx.test:runner:1.5.2'
   implementation 'com.facebook.react:react-android'
   implementation 'com.google.android.gms:play-services-location:21.2.0'
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
