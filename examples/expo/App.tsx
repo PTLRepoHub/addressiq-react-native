@@ -18,7 +18,7 @@ import {
 
 const CONFIG: AddressIQConfig = {
   apiKey: 'aiq_test_demo_bank_seed01',
-  environment: 'staging',
+  deployment: 'staging',
 };
 
 export default function App() {
