@@ -22,19 +22,21 @@
  * data plan.
  */
 
+import { BUILD_SDK_VERSION } from './generated/buildConfig';
 import { getConfig, resolveUrls } from './config';
 import { getNativeEmitter, getNativeModule } from './native/bridge';
 import type { LocationReading, GeofenceTransition } from './types';
 
 /**
- * Reported as `sdkVersion` on every event. Bump the number with the release
- * tag, and keep the `rn/` prefix.
+ * Reported as `sdkVersion` on every event. The number is baked from
+ * package.json, so it tracks the release without being maintained by hand;
+ * keep the `rn/` prefix.
  *
  * The prefix is the only thing identifying which SDK produced an event:
  * `deviceOs` is IOS/ANDROID here too, and a bare semver collides across SDKs.
  * Tokens match the idempotency-key vocabulary (`iqidem_rn_*`), contract §6.6.
  */
-const SDK_VERSION = 'rn/0.10.0';
+const SDK_VERSION = `rn/${BUILD_SDK_VERSION}`;
 const BATCH_THRESHOLD = 10;
 const FLUSH_INTERVAL_MS = 120_000;
 const STORAGE_KEY = '@addressiq/rn-telemetry-queue';

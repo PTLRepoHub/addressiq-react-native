@@ -43,6 +43,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="src/generated/buildConfig.ts"
 
+# SDK version, from package.json — the file release-please bumps. Baked rather
+# than hardcoded in TypeScript so it cannot drift from the published package:
+# x-sdk-version sat at '0.1.0' from the first release through 0.10.0.
+V_SDK_VERSION="$(node -p "require('./package.json').version" 2>/dev/null || printf '')"
+
 STRICT=0
 [ "${1:-}" = "--strict" ] && STRICT=1
 
@@ -163,6 +168,12 @@ export const BUILD_STAGING_WIDGET_INTEGRITY = '$STAGING_WIDGET_INTEGRITY';
 export const BUILD_PROD_WIDGET_VERSION = '$PROD_WIDGET_VERSION';
 /** SRI hash of \`{prod cdn}/v{version}/iqcollect.js\`. */
 export const BUILD_PROD_WIDGET_INTEGRITY = '$PROD_WIDGET_INTEGRITY';
+
+/**
+ * This SDK's version, baked from package.json. Sent as \`x-sdk-version\` and
+ * used for the telemetry envelope, so neither can drift from the release.
+ */
+export const BUILD_SDK_VERSION = '$V_SDK_VERSION';
 EOF
 
 echo "[bake] wrote $OUT"

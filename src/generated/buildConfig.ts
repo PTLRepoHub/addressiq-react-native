@@ -51,3 +51,9 @@ export const BUILD_STAGING_WIDGET_INTEGRITY = 'sha384-Q7LZd2vji9K0ulAu866ywpCzIj
 export const BUILD_PROD_WIDGET_VERSION = '0.5.3';
 /** SRI hash of `{prod cdn}/v{version}/iqcollect.js`. */
 export const BUILD_PROD_WIDGET_INTEGRITY = 'sha384-wUErWmll1WWgesjXvSN93KLxHTDLNXdZ4FMR9nT2tQ7tpdBdEuQCDMkHgdssRvkb';
+
+/**
+ * This SDK's version, baked from package.json. Sent as `x-sdk-version` and
+ * used for the telemetry envelope, so neither can drift from the release.
+ */
+export const BUILD_SDK_VERSION = '0.10.0';
