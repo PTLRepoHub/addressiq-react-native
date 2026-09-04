@@ -1,3 +1,5 @@
+import { BUILD_SDK_VERSION } from '../src/generated/buildConfig';
+
 // `@types/node` is not a dependency of this package and the jest config scopes
 // types to `jest`, so the one filesystem call is declared locally rather than
 // pulling a type package in for a single test.
@@ -98,7 +100,12 @@ describe('telemetry wire envelope', () => {
   it('reports a platform-qualified sdkVersion', () => {
     // `deviceOs` is only IOS/ANDROID, which the native SDKs report too, so the
     // prefix is the only thing identifying React Native in server telemetry.
+    //
+    // Asserted on the built value rather than the source text: the version is
+    // now baked from package.json, and a regex over the literal only ever
+    // proved that someone had typed the right shape by hand.
     const source: string = readFileSync('src/telemetry.ts', 'utf8');
-    expect(source).toMatch(/const SDK_VERSION = 'rn\/\d+\.\d+\.\d+';/);
+    expect(source).toMatch(/const SDK_VERSION = `rn\/\$\{BUILD_SDK_VERSION\}`;/);
+    expect(`rn/${BUILD_SDK_VERSION}`).toMatch(/^rn\/\d+\.\d+\.\d+/);
   });
 });

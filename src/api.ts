@@ -1,3 +1,4 @@
+import { BUILD_SDK_VERSION } from './generated/buildConfig';
 import { getConfig, resolveUrls } from './config';
 import { AddressIQError, type AddressIQErrorCode } from './errors';
 import type { VerificationResult } from './types';
@@ -79,7 +80,10 @@ function buildHeaders(extra: Record<string, string> = {}): Record<string, string
     'Content-Type': 'application/json',
     'x-api-key': cfg.apiKey,
     'x-sdk-name': '@addressiq/react-native',
-    'x-sdk-version': '0.1.0',
+    // Baked from package.json. This was hardcoded '0.1.0' and stayed there
+    // from the first release through 0.10.0, so every request misreported the
+    // SDK version and support could not tell releases apart.
+    'x-sdk-version': BUILD_SDK_VERSION,
     ...extra,
   };
 }
