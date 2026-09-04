@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.1](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.10.0...v0.10.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **ci:** align the demo app's deployment target with its pods ([c3c838a](https://github.com/PTLRepoHub/addressiq-react-native/commit/c3c838a9e20caa6d2d45097362b7dfeb5b21750e))
+* **ci:** raise the demo app past the Swift back-deployment boundary ([5c0190a](https://github.com/PTLRepoHub/addressiq-react-native/commit/5c0190ad2a36d76b802d7609f74d2fa78097fe5b))
+* **rn:** bake x-sdk-version from package.json instead of hardcoding it ([#27](https://github.com/PTLRepoHub/addressiq-react-native/issues/27)) ([8830832](https://github.com/PTLRepoHub/addressiq-react-native/commit/883083222c22e74126421c07b3dfe691c96ed5c4))
+* **widget:** load from the production CDN on every deployment ([1a072c6](https://github.com/PTLRepoHub/addressiq-react-native/commit/1a072c65f2ca127c76207f34be3af4e0abaa94db))
+
 ## [0.10.0](https://github.com/PTLRepoHub/addressiq-react-native/compare/v0.9.0...v0.10.0) (2026-09-01)
 
 
